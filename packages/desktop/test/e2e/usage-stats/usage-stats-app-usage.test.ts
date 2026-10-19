@@ -1,6 +1,5 @@
 import {
   TID_SETTINGS_SECTION_NAV,
-  TID_SETTINGS_USAGE_TAB,
   TID_TASK_SETTINGS_BUTTON,
   testId,
 } from "@zcode/shared";
@@ -69,10 +68,6 @@ async function openAppUsage(): Promise<void> {
   await clickTestIdByDom(testId(TID_SETTINGS_SECTION_NAV, "usage"), {
     timeout: 20_000,
     timeoutMsg: "设置页 Usage 分区没有出现",
-  });
-  await clickTestIdByDom(testId(TID_SETTINGS_USAGE_TAB, "app"), {
-    timeout: 20_000,
-    timeoutMsg: "App Usage tab 没有出现",
   });
   await browser.waitUntil(
     async () => /Token activity|Token 活动/i.test(await $("body").getText()),

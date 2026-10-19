@@ -14,49 +14,6 @@ export const AUTOMATIONS_HOME_CLIENT_SCENES_FIXTURE = {
       scene: "scheduled-task",
       options: {
         prompts: {
-          id: "automations-home-prompts",
-          type: "prompts",
-          contents: { cn: "定时任务模板", en: "Scheduled task template" },
-          items: [
-            {
-              id: "item-standupGitSummary",
-              type: "prompts",
-              contents: {
-                cn: "汇总当前项目的 Git 变更并列出需要跟进的事项。",
-                en: "Summarize the current project's Git changes and follow-ups.",
-              },
-              labels: { cn: "Git 变更摘要", en: "Git change summary" },
-              img: "git-branch",
-            },
-            {
-              id: "item-ciFlakyReport",
-              type: "prompts",
-              contents: {
-                cn: "检查最近的 CI 失败并整理疑似不稳定测试。",
-                en: "Inspect recent CI failures and list suspected flaky tests.",
-              },
-              labels: { cn: "CI 不稳定报告", en: "CI flaky report" },
-              img: "activity",
-            },
-            {
-              id: "item-documentationSyncCheck",
-              type: "prompts",
-              contents: {
-                cn: "检查项目文档与当前实现是否保持同步。",
-                en: "Check whether the project documentation matches the implementation.",
-              },
-              labels: { cn: "文档同步检查", en: "Documentation sync check" },
-              img: "file-text",
-            },
-          ],
-        },
-      },
-    },
-    {
-      namespace: "zcode",
-      scene: "scheduled-task",
-      options: {
-        prompts: {
           id: "scheduled-automations-home-prompts",
           type: "prompts",
           contents: { cn: "定时任务模板", en: "Scheduled task template" },
