@@ -85,5 +85,7 @@ jobs:
         with:
           name: desktop-e2e-shard-${{ matrix.index }}
           path: packages/desktop/.e2e-artifacts/
+          # 产物目录以点开头，upload-artifact 默认会跳过隐藏文件。
+          include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
