@@ -12,10 +12,10 @@ describe("Todo104 Provider 规则身份与内容分离", () => {
     const source = {
       providerRules: [
         {
-          providerId: "account:test",
+          providerId: "builtin:test",
           templateId: "template",
           providerName: "实例",
-          config: { group: "zai-family" },
+          config: { group: "standard-personal" },
         },
       ],
       templateRules: [
@@ -29,7 +29,7 @@ describe("Todo104 Provider 规则身份与内容分离", () => {
     const parsed = parseZCodeBuiltinProviderConfigRules(source);
     expect(parsed.providers.toJSON()).toEqual(source.providerRules);
     expect(parsed.providerTemplates.toJSON()).toEqual(source.templateRules);
-    expect(parsed.providers.get("account:test")?.toJSON()).toEqual({ group: "zai-family" });
+    expect(parsed.providers.get("builtin:test")?.toJSON()).toEqual({ group: "standard-personal" });
     const template = parsed.providerTemplates.get("template")!;
     expect(resolveProviderTemplateName("template", template, "zh-CN")).toBe("模板");
     expect(

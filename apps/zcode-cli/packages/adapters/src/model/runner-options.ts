@@ -17,13 +17,6 @@ type ExperimentalIncludeWithResponseBody = {
   responseBody?: boolean;
 };
 
-/** zcode-plan 业务码常只出现在 finish chunk 的 response.body，流式路径需显式开启。 */
-export function shouldIncludeStreamResponseBody(resolved: ResolvedAiSdkModel): boolean {
-  return (
-    resolved.providerKind === "openai-compatible" && resolved.accountAccess?.mode === "start-plan"
-  );
-}
-
 function mergeRequestHeaders(
   providerHeaders: Record<string, string> | undefined,
   attributionHeaders: Record<string, string>,
@@ -160,15 +153,12 @@ export function createStreamTextOptions(input: {
 
 function createStreamExperimentalInclude(input: {
   includeModelIO: boolean;
-  resolved: ResolvedAiSdkModel;
 }): ExperimentalIncludeWithResponseBody | undefined {
-  if (input.includeModelIO) {
-    return {
-      requestBody: true,
-      responseBody: true,
-    };
-  }
-  return shouldIncludeStreamResponseBody(input.resolved) ? { responseBody: true } : undefined;
+  if (!input.includeModelIO) return undefined;
+  return {
+    requestBody: true,
+    responseBody: true,
+  };
 }
 
 function toAiSdkToolChoice(

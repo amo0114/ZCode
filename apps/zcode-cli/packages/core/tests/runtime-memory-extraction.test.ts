@@ -137,21 +137,13 @@ describe("AgentRuntime background Memory extraction", () => {
     const extractionResponse = deferred<ModelResult>();
     const extractionRequests: ModelRequest[] = [];
     let extractionContext: ModelInvocationContext | undefined;
-    let headerRefreshCount = 0;
     const runtime = createExtractionRuntime({
       async generateText(request, observation) {
         if (!isExtractionRequest(request)) return textResult(request, "main answer");
         extractionRequests.push(request);
         extractionContext = observation.invocationContext;
-        await observation.invocationContext?.refreshRuntimeHeadersBeforeAttempt?.({
-          abortSignal: request.abortSignal,
-          attempt: 1,
-        });
         extractionStarted.resolve();
         return await extractionResponse.promise;
-      },
-      onRuntimeHeaderRefresh: () => {
-        headerRefreshCount += 1;
       },
     });
 
@@ -171,7 +163,6 @@ describe("AgentRuntime background Memory extraction", () => {
         .map((tool) => tool.name)
         .filter((name) => name !== "WebSearch"),
     );
-    expect(headerRefreshCount).toBe(1);
 
     extractionResponse.resolve(textResult(request, "Nothing to save."));
     await runtime.drainMemoryExtractions();
@@ -690,7 +681,6 @@ function createExtractionRuntime(input: {
   memory?: { enabled?: boolean; extractionEnabled?: boolean; use?: boolean };
   inputFormat?: Partial<ModelInputFormat>;
   modelFactory?: RuntimeModelFactory;
-  onRuntimeHeaderRefresh?: () => void;
   sessionStore?: SessionStorePort;
   taskType?: SessionTaskType;
   toolRegistry?: ToolRegistry;
@@ -723,14 +713,6 @@ function createExtractionRuntime(input: {
             ? { properties: { inputFormat: createTestInputFormat(input.inputFormat) } }
             : {}),
         }),
-      providerRuntimeHeadersPort: input.onRuntimeHeaderRefresh
-        ? {
-            async refreshBeforeModelRequest() {
-              input.onRuntimeHeaderRefresh?.();
-              return { headersApplied: true };
-            },
-          }
-        : undefined,
       sessionStore: input.sessionStore ?? createMemorySessionStore(),
       toolRegistry: input.toolRegistry ?? createToolRegistry(),
     },

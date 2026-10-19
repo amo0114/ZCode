@@ -8,10 +8,8 @@ import {
   ModelPropertiesConfig,
   ProviderApiConfig,
   ProviderConfig,
-  ZhipuAccountAccessConfig,
   type RegistryModelConfig,
   type RegistryProviderConfig,
-  type ZhipuAccountMode,
 } from "@zcode/provider";
 import {
   AiSdkModelAdapter as ProductionAiSdkModelAdapter,
@@ -30,7 +28,6 @@ interface LegacyTestProviderConfig {
   readonly apiKey?: string;
   readonly baseURL?: string;
   readonly createLanguageModel?: (modelId: string) => unknown;
-  readonly accountMode?: ZhipuAccountMode;
   readonly headers?: Readonly<Record<string, string>>;
   readonly kind: "anthropic" | "custom" | "openai" | "openai-compatible";
   readonly name?: string;
@@ -43,14 +40,12 @@ interface LegacyTestRegistryConfig extends AiSdkModelExecutionConfig {
 }
 
 interface TestCreateModelOptions {
-  readonly accountMode?: ZhipuAccountMode;
   readonly displayName?: string;
   readonly providerId: string;
   readonly modelId: string;
   readonly optionSpecs?: RegistryModelConfig["optionSpecs"];
   readonly options?: ModelOptions;
   readonly properties?: ModelProperties;
-  readonly requestDependencies?: CreateAiSdkModelOptions["requestDependencies"];
 }
 
 /**
@@ -75,13 +70,13 @@ export class TestProviderConfigFixture {
     this.execution = new AiSdkModelExecution(this.executionConfig(), this.executionOptions);
   }
 
-  resolveConfig(selection: ModelSelection | string, accountMode?: ZhipuAccountMode) {
+  resolveConfig(selection: ModelSelection | string) {
     const resolvedSelection = parseTestSelection(selection, this.config.defaultProvider);
     const source = this.config.providers[resolvedSelection.providerId];
     if (!source) throw new Error(`Unknown test provider: ${resolvedSelection.providerId}`);
     return {
       modelId: resolvedSelection.modelId,
-      providerConfig: toRegistryProviderConfig(resolvedSelection.providerId, source, accountMode),
+      providerConfig: toRegistryProviderConfig(resolvedSelection.providerId, source),
       providerId: resolvedSelection.providerId,
     };
   }
@@ -90,10 +85,7 @@ export class TestProviderConfigFixture {
     selection: ModelSelection | string,
     options: ModelOptions = { maxOutputTokens: 32_000, reasoningLevel: "disabled" },
   ): AiSdkResolvedModel {
-    const resolvedSelection = parseTestSelection(selection, this.config.defaultProvider);
-    const resolved = this.resolveConfig(resolvedSelection);
-    const source = this.config.providers[resolvedSelection.providerId];
-    if (!source) throw new Error(`Unknown test provider: ${resolvedSelection.providerId}`);
+    const resolved = this.resolveConfig(selection);
     const bound = this.execution.bindModel({
       ...resolved,
       supportsJsonSchemaOutput: false,
@@ -101,7 +93,6 @@ export class TestProviderConfigFixture {
     });
     return bound.resolveRequest({
       options: { reasoningLevel: "disabled", ...options },
-      ...(source.accountMode && source.apiKey ? { requestAuth: { apiKey: source.apiKey } } : {}),
     });
   }
 
@@ -126,19 +117,10 @@ export class TestAiSdkModelAdapter extends ProductionAiSdkModelAdapter {
     if ("providerConfig" in options) return super.createModel(options);
     const fixture = this.testProviderConfigs;
     if (!fixture) throw new Error("Test Provider Config fixture is required");
-    const resolved = fixture.resolveConfig(
-      { providerId: options.providerId, modelId: options.modelId },
-      options.accountMode ?? (options.requestDependencies?.requestAuth ? "off-peak" : undefined),
-    );
-    const requestDependencies =
-      options.requestDependencies ??
-      (options.accountMode === "off-peak"
-        ? {
-            requestAuth: {
-              source: { resolve: async () => ({ apiKey: "test-off-peak-key" }) },
-            },
-          }
-        : undefined);
+    const resolved = fixture.resolveConfig({
+      providerId: options.providerId,
+      modelId: options.modelId,
+    });
     const modelConfig = createRegistryModelConfig(options, resolved.providerConfig.api.type);
     const reasoningValues = modelConfig.optionSpecs.reasoningLevel.values;
     return super.createModel({
@@ -151,7 +133,6 @@ export class TestAiSdkModelAdapter extends ProductionAiSdkModelAdapter {
         reasoningLevel: reasoningValues.at(-1) ?? "disabled",
         ...options.options,
       },
-      ...(requestDependencies ? { requestDependencies } : {}),
     });
   }
 }
@@ -239,9 +220,7 @@ function enumOptionMap(mapping: Readonly<Record<string, unknown>>): string {
 function toRegistryProviderConfig(
   providerId: string,
   source: LegacyTestProviderConfig,
-  accountMode?: ZhipuAccountMode,
 ): RegistryProviderConfig {
-  const effectiveAccountMode = accountMode ?? source.accountMode;
   const apiType =
     source.kind === "anthropic"
       ? "anthropic-messages"
@@ -249,14 +228,7 @@ function toRegistryProviderConfig(
         ? "openai-responses"
         : "openai-chat-completions";
   return new ProviderConfig({
-    access: effectiveAccountMode
-      ? new ZhipuAccountAccessConfig({
-          accountType: "zai",
-          mode: effectiveAccountMode,
-        })
-      : source.apiKey
-        ? new ApiKeyAccessConfig({ apiKey: source.apiKey })
-        : new ApiKeyAccessConfig({ apiKey: "test-api-key" }),
+    access: new ApiKeyAccessConfig({ apiKey: source.apiKey ?? "test-api-key" }),
     api: new ProviderApiConfig({
       baseUrl: source.baseURL ?? "https://adapter.test/v1",
       headers: source.headers,

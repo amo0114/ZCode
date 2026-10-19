@@ -40,7 +40,6 @@ const REPORT_BODY_KEYS = [
   "event_text",
   "event_type",
   "mac_id",
-  "marketing_params",
   "message_id",
   "screen_resolution",
   "talk_id",

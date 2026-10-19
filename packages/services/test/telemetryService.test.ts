@@ -220,87 +220,7 @@ describe("telemetryCore", () => {
       // randomUUID 为常量函数，两次调用同值，故与 event_id 恰好相等。
       device_mid: "452a978b-d926-4a65-9c07-b04344a307d0",
       mac_id: "",
-      marketing_params: "{}",
     });
-  });
-
-  it("attaches marketing_params to every report payload", async () => {
-    const home = makeTempHome();
-    const { createTelemetryCore } = await import("../src/telemetry/telemetryCore.js");
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
-    const service = createTelemetryCore({
-      homeDir: home,
-      fetchImpl: fetchMock,
-      loadMarketingParams: async () => ({
-        channel_id: "douyin",
-        utm_source: "wechat",
-        utm_campaign: "summer_sale_2026",
-      }),
-      randomUUID: () => "marketing-event-id",
-    });
-    const context = {
-      clientTimezone: "Asia/Shanghai",
-      clientLanguage: "zh-CN",
-      screenResolution: "3024x1964",
-    };
-
-    await service.reportAppLaunch(context);
-    await service.reportEvent({
-      context,
-      elementName: "button_click",
-      eventRegion: "app",
-      eventType: "click",
-      eventExtraDetail: {},
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    for (const [, init] of fetchMock.mock.calls) {
-      expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({
-        marketing_params:
-          '{"channel_id":"douyin","utm_source":"wechat","utm_campaign":"summer_sale_2026"}',
-      });
-    }
-  });
-
-  it("continues reporting without attribution and warns once when attribution loading fails", async () => {
-    const home = makeTempHome();
-    const { createTelemetryCore } = await import("../src/telemetry/telemetryCore.js");
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
-    const warn = vi.fn();
-    const service = createTelemetryCore({
-      homeDir: home,
-      fetchImpl: fetchMock,
-      loadMarketingParams: async () => {
-        throw new Error("credential unavailable");
-      },
-      warn,
-      randomUUID: () => "marketing-load-failure-event-id",
-    });
-    const context = {
-      clientTimezone: "Asia/Shanghai",
-      clientLanguage: "zh-CN",
-      screenResolution: "3024x1964",
-    };
-
-    await service.reportAppLaunch(context);
-    await service.reportEvent({
-      context,
-      elementName: "button_click",
-      eventRegion: "app",
-      eventType: "click",
-      eventExtraDetail: {},
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith(
-      "Telemetry marketing attribution load failed; continuing without attribution",
-    );
-    for (const [, init] of fetchMock.mock.calls) {
-      expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({
-        marketing_params: "{}",
-      });
-    }
   });
 
   it("uses injected user id loader instead of credential storage details", async () => {
@@ -442,7 +362,6 @@ describe("telemetryCore", () => {
       // device_mid 独立生成，此处因常量 mock 与 event_id 恰好相等（见上方说明）
       device_mid: "custom-event-id",
       mac_id: "",
-      marketing_params: "{}",
       talk_id: "task-001",
       message_id: "message-001",
     });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { modelConfigDataSchema } from "@zcode/shared/model-config";
-import { providerConfigDataSchema, zhipuAccountAccessDataSchema } from "./provider-data-schema.js";
+import { providerConfigDataSchema } from "./provider-data-schema.js";
 import { ModelConfig, ModelConfigRules } from "./model-config.js";
 import {
   ApiKeyAccessConfig,
@@ -9,7 +9,6 @@ import {
   ProviderConfigMap,
   ProviderTemplate,
   ProviderTemplateMap,
-  ZhipuAccountAccessConfig,
 } from "./provider-config.js";
 import {
   builtinModelConfigRulesSchema,
@@ -22,12 +21,6 @@ import {
   type ProviderConfigRuleData,
   type ProviderTemplateConfigRuleData,
 } from "./rule-data-schema.js";
-
-const accountProviderConfigSchema = providerConfigDataSchema
-  .pick({ builtinModelIds: true })
-  .extend({
-    access: zhipuAccountAccessDataSchema.pick({ type: true, entitled: true }).nullable().optional(),
-  });
 
 export function parseProviderConfigMap(input: unknown): ProviderConfigMap {
   return createProviderRules(z.array(providerConfigRuleSchema).parse(input));
@@ -45,26 +38,101 @@ export function parseZCodeBuiltinProviderConfigRules(input: unknown): {
   providers: ProviderConfigMap;
   providerTemplates: ProviderTemplateMap;
 } {
-  const parsed = builtinProviderConfigRulesSchema.parse(input);
+  const parsed = builtinProviderConfigRulesSchema.parse(scrubRetiredProviderConfigRules(input));
   return {
     providers: createProviderRules(parsed.providerRules),
     providerTemplates: createTemplateRules(parsed.templateRules),
   };
 }
 
-export function parsePersonalProviderConfigMap(input: unknown): ProviderConfigMap {
-  return createProviderRules(personalProviderConfigRulesSchema.parse(input).providerRules);
+/**
+ * 智谱账号接入退役后的解码边界清洗：个人配置、内置 Bundled 与远端 Release / LKG 都经此入口。
+ *
+ * 只处理明确退役的数据：`account:*` Provider（个人 Overlay 中这类条目没有 `access`，只能按
+ * providerId 识别）与 `zhipu-account` Access 规则、引用它们的模型规则，以及按 `api-key`
+ * 读取的 `zhipu-coding-plan-api-key`。其余数据仍走 strict 校验，不做“未知即丢弃”。
+ * 必须在 zod 之前执行：旧条目带的 `zai-family` / `bigmodel-family` group 已不在 enum 中。
+ * 磁盘文件不改写；用户之后保存时自然写回清洗结果。
+ */
+const RETIRED_PROVIDER_ID_PREFIX = "account:";
+const RETIRED_API_KEY_ACCESS_TYPE = "zhipu-coding-plan-api-key";
+
+const reportedRetiredProviderIds = new Set<string>();
+
+function isRetiredProviderId(providerId: unknown): boolean {
+  return typeof providerId === "string" && providerId.startsWith(RETIRED_PROVIDER_ID_PREFIX);
 }
 
-/** Account 运行时事实仍只有成员及权益；不是磁盘配置规则的第二种格式。 */
-export function parseAccountProviderConfigMap(input: unknown): ProviderConfigMap {
-  const parsed = z.record(z.string().min(1), accountProviderConfigSchema).parse(input);
-  return new ProviderConfigMap(
-    Object.entries(parsed).map(([providerId, config]) => [
-      providerId,
-      createProviderConfig(config),
-    ]),
+function isRetiredProviderRule(rule: unknown): boolean {
+  if (!isRecord(rule)) return false;
+  if (isRetiredProviderId(rule.providerId)) return true;
+  return isRecord(rule.config) && isRecord(rule.config.access)
+    ? rule.config.access.type === "zhipu-account"
+    : false;
+}
+
+function mapRetiredApiKeyAccess(rule: unknown): unknown {
+  if (!isRecord(rule) || !isRecord(rule.config) || !isRecord(rule.config.access)) return rule;
+  if (rule.config.access.type !== RETIRED_API_KEY_ACCESS_TYPE) return rule;
+  return {
+    ...rule,
+    config: { ...rule.config, access: { ...rule.config.access, type: "api-key" } },
+  };
+}
+
+function scrubRetiredProviderConfigRules(input: unknown): unknown {
+  if (!isRecord(input)) return input;
+  const retired: string[] = [];
+  const output: Record<string, unknown> = { ...input };
+  if (Array.isArray(input.providerRules)) {
+    output.providerRules = input.providerRules
+      .filter((rule) => {
+        if (!isRetiredProviderRule(rule)) return true;
+        retired.push(String((rule as Record<string, unknown>).providerId));
+        return false;
+      })
+      .map(mapRetiredApiKeyAccess);
+  }
+  if (Array.isArray(input.templateRules)) {
+    output.templateRules = input.templateRules.map(mapRetiredApiKeyAccess);
+  }
+  reportRetiredProviderIds(retired);
+  return output;
+}
+
+function scrubRetiredModelConfigRules(input: unknown): unknown {
+  if (!isRecord(input)) return input;
+  const output: Record<string, unknown> = { ...input };
+  for (const key of [
+    "builtinProviderModelRules",
+    "providerModelRules",
+    "manualProviderModelRules",
+  ] as const) {
+    const rules = input[key];
+    if (!Array.isArray(rules)) continue;
+    output[key] = rules.filter((rule) => !isRecord(rule) || !isRetiredProviderId(rule.providerId));
+  }
+  return output;
+}
+
+function reportRetiredProviderIds(retired: readonly string[]): void {
+  // 个人配置每秒轮询重解析，而磁盘条目要等用户保存才消失；按进程去重，避免日志刷屏。
+  // 只记录条目数量与 providerId，不记录凭据。
+  const unreported = retired.filter((providerId) => !reportedRetiredProviderIds.has(providerId));
+  if (unreported.length === 0) return;
+  for (const providerId of unreported) reportedRetiredProviderIds.add(providerId);
+  console.warn(
+    `[provider] 已忽略 ${unreported.length} 条退役的智谱账号 Provider 规则: ${unreported.join(", ")}`,
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parsePersonalProviderConfigMap(input: unknown): ProviderConfigMap {
+  const scrubbed = scrubRetiredProviderConfigRules(input);
+  return createProviderRules(personalProviderConfigRulesSchema.parse(scrubbed).providerRules);
 }
 
 export function parseProviderConfig(input: unknown): ProviderConfig {
@@ -76,7 +144,7 @@ export function parseModelConfig(input: unknown): ModelConfig {
 }
 
 export function parseZCodeBuiltinModelConfigRules(input: unknown): ModelConfigRules {
-  const parsed = builtinModelConfigRulesSchema.parse(input);
+  const parsed = builtinModelConfigRulesSchema.parse(scrubRetiredModelConfigRules(input));
   return new ModelConfigRules([
     ...parsed.modelRules.map((rule) => ({
       ...rule,
@@ -107,7 +175,7 @@ export function parseZCodeBuiltinModelConfigRules(input: unknown): ModelConfigRu
 }
 
 export function parsePersonalModelConfigRules(input: unknown): ModelConfigRules {
-  const parsed = personalModelConfigRulesSchema.parse(input);
+  const parsed = personalModelConfigRulesSchema.parse(scrubRetiredModelConfigRules(input));
   return new ModelConfigRules([
     ...parsed.providerModelRules.map((rule) => ({
       ...rule,
@@ -145,12 +213,7 @@ function createTemplateRules(
 function createProviderConfig(config: z.infer<typeof providerConfigDataSchema>): ProviderConfig {
   return new ProviderConfig({
     ...config,
-    access:
-      config.access == null
-        ? config.access
-        : config.access.type !== "zhipu-account"
-          ? new ApiKeyAccessConfig(config.access)
-          : new ZhipuAccountAccessConfig(config.access),
+    access: config.access == null ? config.access : new ApiKeyAccessConfig(config.access),
     api: config.api == null ? config.api : new ProviderApiConfig(config.api),
   });
 }

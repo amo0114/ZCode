@@ -443,7 +443,6 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
         noProxy: configResult.config.network.noProxy,
         caCertFile: configResult.config.network.caCertFile,
       });
-    const providerEndpointRoutingPort = options.providerEndpointRoutingPort;
     markMcpAdapterInitialized({
       configuredMcpServers,
       hasInjectedMcpPort: options.mcpPort !== undefined,
@@ -563,7 +562,6 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
 
     const modelExecutionConfig = createRuntimeAiSdkModelExecutionConfig(options.env, {
       appVersion,
-      endpointRoutingPort: providerEndpointRoutingPort,
       network: configResult.config.network,
       sourceTitle: options.sourceTitle,
     });
@@ -862,7 +860,6 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
       eventSink: options.eventSink,
       modelFactory,
       modelIoDir,
-      providerRuntimeHeadersPort: options.providerRuntimeHeadersPort,
       resolveEffectiveModelSelection: options.resolveEffectiveModelSelection,
       isRemoteWorkspace: () =>
         isRemoteWorkspaceIdentity(runtimeConfig.memory?.workspaceIdentity ?? ""),
@@ -873,7 +870,6 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
       dynamicWorkflowSnippetPort,
       modelCatalogPort,
       automationPort: options.automationPort,
-      offPeakPort: options.offPeakPort,
       topicResourcePort: options.topicResourcePort,
       appVersion,
       traceContext,

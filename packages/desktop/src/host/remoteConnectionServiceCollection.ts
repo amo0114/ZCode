@@ -13,7 +13,6 @@ import {
   IZCodeSessionService,
   IFileWatcherService,
   IOAuthService,
-  ICodingPlanSubscriptionService,
   IClientConfigService,
   IClientScenesService,
   ISkillsService,
@@ -31,9 +30,6 @@ import {
   createSettingService,
   createBroadcastService,
   createOAuthService,
-  createOAuthProviderLogoutHandler,
-  createAccountProviderCredentialStore,
-  createCodingPlanSubscriptionService,
   createClientScenesService,
   createSettingsSyncService,
   createMediaPreviewService,
@@ -50,11 +46,6 @@ export function createRemoteConnectionServiceCollection(params: {
   remoteZCodeSessionService: IZCodeSessionService;
   promptAttachmentTransferService: IPromptAttachmentTransferService;
 }): ServiceCollection {
-  const handleOAuthProviderLogout = createOAuthProviderLogoutHandler({
-    accountProviderCredentialStore: createAccountProviderCredentialStore({
-      credentialService: params.credentialService,
-    }),
-  });
   // 修复原因：remote connection host 直接暴露给 renderer 的 service 集合也要包含
   // 远端文件系统相关服务；否则远端 skill 同步会命中 Unknown channel 或误回落到本机。
   return (
@@ -77,20 +68,7 @@ export function createRemoteConnectionServiceCollection(params: {
       .register(IZCodeSessionService, params.remoteZCodeSessionService)
       .register(IPromptAttachmentTransferService, params.promptAttachmentTransferService)
       .register(IFileWatcherService, params.connectionServices.fileWatcherService)
-      .register(
-        IOAuthService,
-        createOAuthService(params.credentialService, {
-          apiClient: params.apiClient,
-          onProviderLogout: handleOAuthProviderLogout,
-        }),
-      )
-      .register(
-        ICodingPlanSubscriptionService,
-        createCodingPlanSubscriptionService({
-          apiClient: params.apiClient,
-          credentialService: params.credentialService,
-        }),
-      )
+      .register(IOAuthService, createOAuthService(params.credentialService))
       .register(IClientScenesService, createClientScenesService({ apiClient: params.apiClient }))
       .register(IClientConfigService, params.clientConfigService)
       .register(ISkillsService, params.connectionServices.skillsService)

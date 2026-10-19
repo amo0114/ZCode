@@ -4,12 +4,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import {
-  resolveBigModelApiOrigin,
-  resolveRuntimeZCodeEndpointOrigin,
-  resolveZaiOAuthClientId,
-  resolveZaiOAuthOrigin,
-} from "../shared/src/zcodeEndpoint.js";
+import { resolveRuntimeZCodeEndpointOrigin } from "../shared/src/zcodeEndpoint.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = resolve(HERE, "../..");
@@ -20,10 +15,6 @@ export default defineConfig(({ mode }) => {
   const zcodeEnv = env.ZCODE_ENV?.trim().toLowerCase() === "production" ? "production" : "test";
   const endpointEnv = { ...env, ZCODE_ENV: zcodeEnv };
   const endpointOrigin = resolveRuntimeZCodeEndpointOrigin(endpointEnv);
-  const oauthOrigin = resolveZaiOAuthOrigin(endpointEnv);
-  const oauthClientId = resolveZaiOAuthClientId(endpointEnv);
-  // BigModel 授权入口必须跟随 ZCODE_ENV，否则测试环境会把测试账号带到生产授权页。
-  const bigmodelOAuthOrigin = resolveBigModelApiOrigin(endpointEnv);
 
   return {
     root: resolve(HERE),
@@ -42,12 +33,6 @@ export default defineConfig(({ mode }) => {
           REPO_ROOT,
           "packages/share-ui/src/index.ts",
         ),
-        // 登录卡片要用 provider 图标（svg 走 @ -> packages/ui/src 别名解析）。
-        // 该模块只依赖 shared/lucide/cn，不会把 services/rpc 闭包带进 share 镜像。
-        "@zcode/ui/oauth-provider-icon": resolve(
-          REPO_ROOT,
-          "packages/ui/src/lib/oauthProviderIcon.tsx",
-        ),
       },
     },
     define: {
@@ -56,9 +41,6 @@ export default defineConfig(({ mode }) => {
       __ZCODE_ENV__: JSON.stringify(zcodeEnv),
       "import.meta.env.VITE_ZCODE_BASE_URL": JSON.stringify(endpointOrigin),
       "import.meta.env.VITE_ZCODE_ENDPOINT_ORIGIN": JSON.stringify(endpointOrigin),
-      "import.meta.env.VITE_ZAI_OAUTH_CLIENT_ID": JSON.stringify(oauthClientId),
-      "import.meta.env.VITE_ZAI_OAUTH_ORIGIN": JSON.stringify(oauthOrigin),
-      "import.meta.env.VITE_BIGMODEL_OAUTH_ORIGIN": JSON.stringify(bigmodelOAuthOrigin),
     },
     build: {
       outDir: resolve(REPO_ROOT, "packages/web-share/dist"),

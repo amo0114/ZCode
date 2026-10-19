@@ -160,7 +160,6 @@ export type {
   ModelExecutionContext,
   PromptAdmissionOptions,
   PromptAdmissionReceipt,
-  ProviderRuntimeHeadersPort,
   ResumeSessionOptions,
   ResumeSessionResult,
   StartSavedWorkflowRunResult,

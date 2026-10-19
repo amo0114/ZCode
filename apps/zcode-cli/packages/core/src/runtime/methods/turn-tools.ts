@@ -22,7 +22,6 @@ import { handleToolCallAnomalyWarnings } from "./turn-tool-warnings.js";
 import type { RegularTurnLoopState } from "./turn-loop-state.js";
 import {
   isAutomationMutationRestrictedTurn,
-  isOffPeakCreateRestrictedTurn,
   recordCompletedToolBatch,
 } from "./turn-loop-state.js";
 import { settleToolResults, type ToolResultPart } from "./tool-result-settlement.js";
@@ -157,7 +156,6 @@ export async function executeToolCallsForModelStep(
     });
     const execution = await this.executeTools(pendingToolCalls, pendingSchedule, {
       automationTurn: isAutomationMutationRestrictedTurn(state),
-      offPeakTurn: isOffPeakCreateRestrictedTurn(state),
       signal: state.turnAbortSignal,
       traceContext: options.modelTraceContext,
       subagentModelOverride: state.subagentModelOverride,

@@ -137,7 +137,7 @@ import { ConversationFileRewindDialog } from "@/v4/ConversationFileRewindDialog.
 import { BotGroupSourceLabel } from "@/v4/BotGroupSourceLabel.js";
 import { splitUserInputEpilogue } from "@/v4/ConversationUserInputEpilogue.js";
 import { ConversationHookDetailsAction } from "@/v4/ConversationHookDetailsAction.js";
-import { formatModelChangeLabel } from "@/v4/composer/modelTriggerDisplay.js";
+import { formatProviderModelLabel } from "@/v4/composer/modelTriggerDisplay.js";
 import { formatMessageTimeLabel } from "@/v4/messageTimeLabel.js";
 import { parseConversationShareContext } from "@/lib/conversationShareContext.js";
 
@@ -1979,7 +1979,7 @@ const TimelineMarkerRowView = memo(function TimelineMarkerRowView({
         // 这里保留 provider ID fallback，并让现有 marker 随目录更新。
         const fromProvider = resolveProviderLabel(marker.fromProvider, modelSelectionView);
         const toProvider = resolveProviderLabel(marker.toProvider, modelSelectionView);
-        const to = formatModelChangeLabel(marker.toProvider, toProvider, marker.toModel, intl);
+        const to = formatProviderModelLabel(toProvider, marker.toModel);
         if (marker.fromProvider === undefined || marker.fromModel === undefined) {
           return {
             // source-less 表示首次使用的模型事实，不是模型切换，因此不显示切换箭头。
@@ -1993,12 +1993,7 @@ const TimelineMarkerRowView = memo(function TimelineMarkerRowView({
           label: intl.formatMessage(
             { id: "chat.modelChange.switched" },
             {
-              from: formatModelChangeLabel(
-                marker.fromProvider,
-                fromProvider,
-                marker.fromModel,
-                intl,
-              ),
+              from: formatProviderModelLabel(fromProvider, marker.fromModel),
               to,
             },
           ),

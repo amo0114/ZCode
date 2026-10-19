@@ -66,8 +66,7 @@ describe("Root startup gate", () => {
 
   it("provider 启动同步未完成时会延后首屏放行", () => {
     const providerStartupSyncPending = isProviderStartupSyncPending({
-      providerFamilyDomainMigrationComplete: false,
-      modelSelectionViewHydrated: true,
+      modelSelectionViewHydrated: false,
     });
     expect(providerStartupSyncPending).toBe(true);
     expect(

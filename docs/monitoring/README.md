@@ -26,7 +26,6 @@ CLI Agent 的 OpenTelemetry 执行链路已独立到
 - [Plan Usage ARMS 自定义事件](./plan-usage-arms-telemetry.md)
 - [远程场景使用量埋点 V1](./remote-usage-telemetry-v1.md)
 - [远程工作区连接 ARMS 自定义事件](./remote-usage-arms-telemetry.md)
-- [Off-Peak Task telemetry V1](./off-peak-task-telemetry-v1.md)
 - [Session 首次打开 ARMS 埋点](./session-open-telemetry.md)
 - [定时任务 / 闲时任务消息埋点](./automation-message-telemetry.md)
 

@@ -10,7 +10,6 @@ import {
 } from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import { createRuntimeModel } from "./runtime-model.js";
-import { createRefreshRuntimeHeadersBeforeModelAttempt } from "./model-runtime-headers.js";
 import { recordModelUsageFact } from "./usage-observability.js";
 
 export interface SampleModelInput {
@@ -71,11 +70,6 @@ export async function sampleModel(
         modelCall: { operation: "workspace_generate_text" },
         statusSink: this.createModelStatusSink(traceContext, events, { persist: false }),
         traceContext,
-        refreshRuntimeHeadersBeforeAttempt: createRefreshRuntimeHeadersBeforeModelAttempt(this, {
-          abortSignal: signal,
-          model,
-          traceContext,
-        }),
       },
       () =>
         model.generateText({

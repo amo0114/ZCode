@@ -107,11 +107,6 @@ describe("Agent Runtime Model lifecycle", () => {
   it("keeps an execution-scoped model isolated from the persistent Submission selection", async () => {
     const eventStore = createTestSessionEventStore();
     const createdModelIds: string[] = [];
-    const createdRequestAuthSources: unknown[] = [];
-    const secret = "turn-only-key-do-not-persist";
-    const requestAuthSource = {
-      resolve: vi.fn().mockResolvedValue({ apiKey: secret }),
-    };
     const runtime = createTestAgentRuntime(
       createSessionId("temporary-execution-model-lifecycle"),
       {
@@ -123,11 +118,9 @@ describe("Agent Runtime Model lifecycle", () => {
         eventStore,
         modelFactory: ((input: {
           selection: ModelSelection;
-          requestDependencies?: { requestAuth?: { source?: unknown } };
         }) => {
           const modelSelection = modelSelectionFromSelection(input.selection);
           createdModelIds.push(String(modelSelection.modelId));
-          createdRequestAuthSources.push(input.requestDependencies?.requestAuth?.source);
           return createLifecycleTestModel(modelSelection);
         }) as never,
       },
@@ -142,23 +135,16 @@ describe("Agent Runtime Model lifecycle", () => {
       },
       modelExecution: {
         selectionScope: "execution",
-        requestDependencies: { requestAuth: { source: requestAuthSource } },
       },
     });
 
     await runtime.executeTurn("ordinary task");
 
     expect(createdModelIds).toEqual(["idle-model", "session-model"]);
-    expect(createdRequestAuthSources).toEqual([requestAuthSource, undefined]);
     expect(runtime.getSessionModelSelection()).toMatchObject({
       providerId: "test",
       modelId: "session-model",
     });
-    expect(
-      JSON.stringify(
-        await eventStore.getEvents(createSessionId("temporary-execution-model-lifecycle")),
-      ),
-    ).not.toContain(secret);
   });
 
   it("keeps one Model across all steps of a loop and creates a new Model for the next turn", async () => {
@@ -386,18 +372,12 @@ describe("Agent Runtime Model lifecycle", () => {
     const permissionBroker = {
       requestPermission: vi.fn(() => permissionGate),
     };
-    const requestAuthSource = {
-      resolve: vi.fn().mockResolvedValue({ apiKey: "permission-turn-key" }),
-    };
     const modelCalls: string[] = [];
-    const requestAuthSources: unknown[] = [];
     const modelFactory = vi.fn(
       (input: {
         selection: ModelSelection;
-        requestDependencies?: { requestAuth?: { source?: unknown } };
       }) => {
         const modelSelection = modelSelectionFromSelection(input.selection);
-        requestAuthSources.push(input.requestDependencies?.requestAuth?.source);
         let calls = 0;
         return {
           ...createLifecycleTestModel(modelSelection),
@@ -438,14 +418,12 @@ describe("Agent Runtime Model lifecycle", () => {
       },
       modelExecution: {
         selectionScope: "execution",
-        requestDependencies: { requestAuth: { source: requestAuthSource } },
       },
     });
 
     await vi.waitFor(() => expect(permissionBroker.requestPermission).toHaveBeenCalledTimes(1));
     expect(modelFactory).toHaveBeenCalledTimes(1);
     expect(modelCalls).toEqual(["idle-model:1"]);
-    expect(requestAuthSources).toEqual([requestAuthSource]);
 
     approve();
     await executing;
@@ -459,20 +437,17 @@ describe("Agent Runtime Model lifecycle", () => {
     });
   });
 
-  it("keeps the execution-scoped Model and request auth while reactive compact retries after a session model switch", async () => {
+  it("keeps the execution-scoped Model while reactive compact retries after a session model switch", async () => {
     let runtime: ReturnType<typeof createTestAgentRuntime>;
     let overflowThrown = false;
     const createdModelIds: string[] = [];
-    const createdRequestAuthSources: unknown[] = [];
     const callsByModel: string[] = [];
     const modelFactory = vi.fn(
       (input: {
         selection: ModelSelection;
-        requestDependencies?: { requestAuth?: { source?: unknown } };
       }) => {
         const modelSelection = modelSelectionFromSelection(input.selection);
         createdModelIds.push(modelSelection.modelId);
-        createdRequestAuthSources.push(input.requestDependencies?.requestAuth?.source);
         const model: Model = {
           providerId: modelSelection.providerId,
           modelId: modelSelection.modelId,
@@ -538,9 +513,6 @@ describe("Agent Runtime Model lifecycle", () => {
 
     await runtime.executeTurn("first setup turn");
     await runtime.executeTurn("second setup turn");
-    const requestAuthSource = {
-      resolve: vi.fn().mockResolvedValue({ apiKey: "compact-turn-key" }),
-    };
     await runtime.executeTurn("trigger overflow", undefined, {
       intent: {
         sourceCommandId: "compact-command",
@@ -550,12 +522,10 @@ describe("Agent Runtime Model lifecycle", () => {
       },
       modelExecution: {
         selectionScope: "execution",
-        requestDependencies: { requestAuth: { source: requestAuthSource } },
       },
     });
 
     expect(createdModelIds).toEqual(["model-a", "model-a", "idle-model"]);
-    expect(createdRequestAuthSources).toEqual([undefined, undefined, requestAuthSource]);
     expect(callsByModel.slice(-3)).toEqual([
       "idle-model:normal",
       "idle-model:compact",

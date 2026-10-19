@@ -5,15 +5,13 @@
  * 通过 useOAuth hook 驱动 OAuth 流程。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Loader2Icon, LoaderIcon, TriangleAlertIcon } from "lucide-react";
+import { Loader2Icon, LoaderIcon, LogInIcon, TriangleAlertIcon } from "lucide-react";
 import {
   type OAuthProviderMeta,
-  BIGMODEL_PROVIDER_ID,
   TID_LOGIN_USE_API_KEY_BUTTON,
   TID_OAUTH_CANCEL,
   TID_OAUTH_ERROR,
   TID_OAUTH_LOGIN_BUTTON,
-  ZAI_PROVIDER_ID,
   testId,
 } from "@zcode/shared";
 import { Alert, AlertDescription } from "./components/ui/alert.js";
@@ -22,7 +20,6 @@ import { ZCodeAboutLogo } from "@/components/ui/ZCodeAboutLogo.js";
 import { useOAuth } from "./hooks/useOAuth.js";
 import { useZCodeIntl } from "./i18n/IntlProvider.js";
 import { LoginApiKeyForm } from "./login/LoginApiKeyForm.js";
-import { renderOAuthProviderIcon } from "./lib/oauthProviderIcon.js";
 import { ThemeHeroVisual } from "./openWorkspacePageThemeHero.js";
 import { useZCodeStore } from "./store/StoreProvider.js";
 import { DesktopOverlayWindowControls } from "@/DesktopOverlayWindowControls.js";
@@ -52,25 +49,6 @@ interface LoginPanelProps {
   onComplete: (reason: LoginCompleteReason) => void | Promise<void>;
 }
 
-interface ActiveLoginEntryAttempt {
-  id: number;
-  providerId: OAuthProviderMeta["id"];
-}
-
-export function shouldCompleteProviderLoginAttempt(params: {
-  attempt: ActiveLoginEntryAttempt | null;
-  successProvider: OAuthProviderMeta["id"] | null;
-}): boolean {
-  return !params.attempt || params.successProvider === params.attempt.providerId;
-}
-
-export function shouldCompleteLoginFromExistingUser(params: {
-  hasUser: boolean;
-  attempt: ActiveLoginEntryAttempt | null;
-}): boolean {
-  return params.hasUser && !params.attempt;
-}
-
 export function LoginPanel({ active, onComplete }: LoginPanelProps) {
   const { intl } = useZCodeIntl();
   const {
@@ -87,55 +65,19 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
   const user = useZCodeStore((s) => s.user);
   const oauthError = useZCodeStore((s) => s.oauthError);
   const setOAuthError = useZCodeStore((s) => s.setOAuthError);
-  const oauthSuccessSeq = useZCodeStore((s) => s.oauthSuccessSeq);
-  const lastOAuthSuccessProvider = useZCodeStore((s) => s.lastOAuthSuccessProvider);
-  const loginEntryRequest = useZCodeStore((s) => s.loginEntryRequest);
-  const clearLoginEntryRequest = useZCodeStore((s) => s.clearLoginEntryRequest);
-  const markLoginEntryAttemptStatus = useZCodeStore((s) => s.markLoginEntryAttemptStatus);
   const [loginMode, setLoginMode] = useState<"providers" | "apiKey">("providers");
   const wasActiveRef = useRef(active);
-  const consumedLoginRequestRef = useRef<number | null>(null);
-  const observedOAuthSuccessSeqRef = useRef(oauthSuccessSeq);
   const lastAttemptProviderRef = useRef<OAuthProviderMeta["id"] | null>(null);
-  const activeLoginEntryAttemptRef = useRef<ActiveLoginEntryAttempt | null>(null);
-
-  const finishActiveLoginEntryAttempt = useCallback(
-    (status: "succeeded" | "cancelled" | "failed") => {
-      const attempt = activeLoginEntryAttemptRef.current;
-      if (!attempt) {
-        return;
-      }
-      activeLoginEntryAttemptRef.current = null;
-      markLoginEntryAttemptStatus(attempt.id, status);
-    },
-    [markLoginEntryAttemptStatus],
-  );
 
   const startTrackedLogin = useCallback(
-    (
-      provider: OAuthProviderMeta["id"],
-      options?: Parameters<typeof startLogin>[1],
-      loginEntryAttemptId?: number,
-    ) => {
-      const activeAttempt = activeLoginEntryAttemptRef.current;
-      if (activeAttempt && activeAttempt.id !== loginEntryAttemptId) {
-        // 用户在统一登录页开始另一条登录流程时，旧购买意图不能继续等待。
-        finishActiveLoginEntryAttempt("cancelled");
-      }
+    (provider: OAuthProviderMeta["id"]) => {
       // 上一次失败遗留的 store oauthError 若不清掉，新流程进入等待态后
-      // 失败提示会和等待提示同屏（如失败后关闭登录入口，再从设置页自动续接登录）。
+      // 失败提示会和等待提示同屏。
       setOAuthError(null);
-      if (loginEntryAttemptId !== undefined) {
-        activeLoginEntryAttemptRef.current = {
-          id: loginEntryAttemptId,
-          providerId: provider,
-        };
-        markLoginEntryAttemptStatus(loginEntryAttemptId, "waiting");
-      }
       lastAttemptProviderRef.current = provider;
-      return startLogin(provider, options);
+      return startLogin(provider);
     },
-    [finishActiveLoginEntryAttempt, markLoginEntryAttemptStatus, setOAuthError, startLogin],
+    [setOAuthError, startLogin],
   );
 
   const providerNameMap = useMemo(
@@ -146,7 +88,6 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
   const pendingProviderName = pendingProvider
     ? (providerNameMap.get(pendingProvider) ?? pendingProvider)
     : null;
-  const visibleProviders = useMemo(() => resolveVisibleLoginProviders(providers), [providers]);
 
   useEffect(() => {
     if (active) {
@@ -154,97 +95,22 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
     }
   }, [active, refreshProviders]);
 
-  useEffect(() => {
-    if (
-      !active ||
-      !loginEntryRequest?.providerId ||
-      consumedLoginRequestRef.current === loginEntryRequest.id
-    ) {
-      return;
-    }
-
-    consumedLoginRequestRef.current = loginEntryRequest.id;
-    clearLoginEntryRequest(loginEntryRequest.id);
-    // Model Provider 的登录/连接入口以前绕过统一登录入口直接发起 OAuth，
-    // 导致用户看不到统一的等待、取消和错误状态。这里在 WelcomeScreen 打开后自动启动指定 provider，
-    // 复用登录入口的 loading 流程，同时用 request id 防止 React 严格模式下重复发起。
-    void startTrackedLogin(
-      loginEntryRequest.providerId,
-      {
-        purpose: loginEntryRequest.purpose,
-      },
-      loginEntryRequest.id,
-    );
-  }, [active, clearLoginEntryRequest, loginEntryRequest, startTrackedLogin]);
-
   // Root 层 OAuth 回调失败时写入 Zustand oauthError，统一登录入口负责显示错误。
   useEffect(() => {
     if (oauthError && active) {
-      finishActiveLoginEntryAttempt("failed");
       reset(); // 重置 useOAuth 的 waiting 状态
       // oauthError 已在 store 中，下方 UI 会读取并显示
     }
-  }, [active, finishActiveLoginEntryAttempt, oauthError, reset]);
-
-  useEffect(() => {
-    if (active && status === "error") {
-      finishActiveLoginEntryAttempt("failed");
-    }
-  }, [active, finishActiveLoginEntryAttempt, status]);
+  }, [active, oauthError, reset]);
 
   // OAuth 回调成功后 Root 层设置 user，统一登录入口自动关闭。
   useEffect(() => {
-    if (
-      active &&
-      shouldCompleteLoginFromExistingUser({
-        hasUser: Boolean(user),
-        attempt: activeLoginEntryAttemptRef.current,
-      })
-    ) {
-      // 全局 user 可能来自另一个 Provider，不能把刚发起的购买登录
-      // 误判为成功；Provider-specific attempt 只由匹配的 OAuth success 完成。
+    if (active && user) {
       reset();
       setOAuthError(null);
       void onComplete("oauth");
     }
-  }, [active, finishActiveLoginEntryAttempt, onComplete, reset, setOAuthError, user]);
-
-  useEffect(() => {
-    if (!active) {
-      observedOAuthSuccessSeqRef.current = oauthSuccessSeq;
-      return;
-    }
-
-    if (oauthSuccessSeq > observedOAuthSuccessSeqRef.current) {
-      observedOAuthSuccessSeqRef.current = oauthSuccessSeq;
-    } else {
-      return;
-    }
-
-    if (
-      status === "waiting" &&
-      shouldCompleteProviderLoginAttempt({
-        attempt: activeLoginEntryAttemptRef.current,
-        successProvider: lastOAuthSuccessProvider,
-      })
-    ) {
-      // provider connection 复用同一个登录入口视觉流程，
-      // 但成功后不会写 App user；这里用 Root 的成功信号关闭登录入口，保持用户交互不变。
-      finishActiveLoginEntryAttempt("succeeded");
-      reset();
-      setOAuthError(null);
-      void onComplete("oauth");
-    }
-  }, [
-    active,
-    finishActiveLoginEntryAttempt,
-    lastOAuthSuccessProvider,
-    oauthSuccessSeq,
-    onComplete,
-    reset,
-    setOAuthError,
-    status,
-  ]);
+  }, [active, onComplete, reset, setOAuthError, user]);
 
   const resetApiKeyForm = useCallback(() => {
     setLoginMode("providers");
@@ -264,22 +130,10 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
     if (status === "waiting") {
       void cancel(pendingProvider ?? undefined);
     }
-    finishActiveLoginEntryAttempt("cancelled");
     reset();
     setOAuthError(null);
-    clearLoginEntryRequest();
     resetApiKeyForm();
-  }, [
-    active,
-    cancel,
-    clearLoginEntryRequest,
-    finishActiveLoginEntryAttempt,
-    pendingProvider,
-    reset,
-    resetApiKeyForm,
-    setOAuthError,
-    status,
-  ]);
+  }, [active, cancel, pendingProvider, reset, resetApiKeyForm, setOAuthError, status]);
 
   return (
     <>
@@ -303,42 +157,25 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
               </div>
             ) : null}
 
-            {!loadingProviders && providers.length === 0 ? (
-              <Alert
-                variant="warning"
-                className="flex items-center justify-center gap-2 text-center"
-                data-testid={TID_OAUTH_ERROR}
-              >
-                <TriangleAlertIcon className="size-4" />
-                <AlertDescription className="text-center">
-                  {intl.formatMessage({ id: "login.oauth.noProviders" })}
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
             {!loadingProviders ? (
               <div className="space-y-2">
-                {visibleProviders.map((provider) => (
+                {/* 没有已注册的登录渠道时只保留 API Key 入口（I7）。 */}
+                {providers.map((provider) => (
                   <Button
                     key={provider.id}
                     variant="default"
                     className="h-10 w-full text-ui-base"
                     size="lg"
-                    data-testid={
-                      provider.id === BIGMODEL_PROVIDER_ID
-                        ? TID_OAUTH_LOGIN_BUTTON
-                        : testId(TID_OAUTH_LOGIN_BUTTON, provider.id)
-                    }
+                    data-testid={testId(TID_OAUTH_LOGIN_BUTTON, provider.id)}
                     onClick={() => void startTrackedLogin(provider.id)}
                   >
-                    {renderOAuthProviderIcon(provider.id, "size-4")}
+                    <LogInIcon className="size-4 shrink-0" />
                     <span className="min-w-0 truncate">
                       {intl.formatMessage(
-                        { id: getLoginOAuthButtonMessageId(provider.id) },
+                        { id: "login.oauth.button" },
                         { provider: provider.displayName },
                       )}
                     </span>
-                    <LoginOAuthRegionTag providerId={provider.id} />
                   </Button>
                 ))}
                 <Button
@@ -388,7 +225,6 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
               onClick={() => {
                 // OAuth 等待态里的“取消”只应取消浏览器授权等待，
                 // 不能关闭整个登录入口，否则用户需要重新从入口打开才能换登录方式。
-                finishActiveLoginEntryAttempt("cancelled");
                 void cancel(pendingProvider ?? undefined);
               }}
             >
@@ -424,7 +260,7 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
                   return;
                 }
                 // OAuth 回调失败会触发 reset()，它会清空 pendingProvider。
-                // 重新登录必须沿用刚才失败的渠道，不能因为 providers[0] 的原始顺序退回 BigModel。
+                // 重新登录必须沿用刚才失败的渠道，不能退回 providers[0]。
                 // store 残留错误由 startTrackedLogin 发起前统一清理。
                 void startTrackedLogin(retryProvider);
               }}
@@ -440,7 +276,6 @@ export function LoginPanel({ active, onComplete }: LoginPanelProps) {
                 // 失败态不能只有「重新登录」沿原渠道重试：想换渠道只能关闭
                 // 登录入口重开，容易在同一条失败链路上反复失败。这里对齐等待态取消的
                 // 语义：结束本次失败流程回到渠道列表，登录入口不关闭。
-                finishActiveLoginEntryAttempt("cancelled");
                 setOAuthError(null);
                 void cancel(pendingProvider ?? undefined);
               }}
@@ -486,65 +321,6 @@ function LoginPanelLogo() {
       <ZCodeAboutLogo className="h-auto w-10" />
     </div>
   );
-}
-
-function getLoginOAuthButtonMessageId(providerId: string): string {
-  switch (providerId) {
-    case ZAI_PROVIDER_ID:
-      return "login.oauth.button.zai";
-    case BIGMODEL_PROVIDER_ID:
-      return "login.oauth.button.bigmodel";
-    default:
-      return "login.oauth.button";
-  }
-}
-
-function getLoginOAuthRegionTagMessageId(providerId: string): string | null {
-  switch (providerId) {
-    case ZAI_PROVIDER_ID:
-      return "login.oauth.regionTag.zai";
-    case BIGMODEL_PROVIDER_ID:
-      return "login.oauth.regionTag.bigmodel";
-    default:
-      return null;
-  }
-}
-
-function LoginOAuthRegionTag({ providerId }: { providerId: string }) {
-  const { intl } = useZCodeIntl();
-  const messageId = getLoginOAuthRegionTagMessageId(providerId);
-
-  if (!messageId) {
-    return null;
-  }
-
-  return (
-    <span className="ml-1 inline-flex h-5 shrink-0 items-center rounded-full border border-primary-foreground/30 px-2 text-ui-xs font-medium leading-none text-primary-foreground/60">
-      {intl.formatMessage({ id: messageId })}
-    </span>
-  );
-}
-
-function getProviderPriority(provider: OAuthProviderMeta): number {
-  switch (provider.id) {
-    // Windows 登录入口里 z.ai 入口需要固定排在最上面，
-    // 之前把 BigModel 设成更高优先级后，用户首屏会先看到次要入口。
-    // 这里直接调整排序权重，只改展示顺序，不影响 OAuth provider 的真实配置来源。
-    case ZAI_PROVIDER_ID:
-      return 0;
-    case BIGMODEL_PROVIDER_ID:
-      return 1;
-    default:
-      return 10 + provider.order;
-  }
-}
-
-export function resolveVisibleLoginProviders(providers: OAuthProviderMeta[]): OAuthProviderMeta[] {
-  // Bugfix: ZAI / BigModel 现在共享 App 登录事实源，未登录时登录入口必须同时展示两个入口。
-  // 旧逻辑曾临时隐藏 BigModel，导致用户无法主动选择 BigModel 作为 active provider。
-  return [...providers].sort((left, right) => {
-    return getProviderPriority(left) - getProviderPriority(right);
-  });
 }
 
 export function resolveLoginRetryProvider({

@@ -1,0 +1,44 @@
+import type { ModelSelectionView } from "@zcode/provider";
+
+/**
+ * 中性 Registry 视图桩：两个域同时存在，用于锁定工具只能选择当前账号域，
+ * 不能按 Provider 顺序猜。原先复用闲时隐藏 Provider，闲时功能移除后改为此处自建占位。
+ */
+export function modelSelectionView(
+  values: readonly string[] = ["disabled", "high", "max"],
+): ModelSelectionView {
+  return {
+    revision: 1,
+    providers: (["zai", "bigmodel"] as const).map((family) => ({
+      providerId: `fixture-provider-${family}`,
+      config: { visibility: "hidden" },
+      models: [family === "zai" ? "ZAI-only" : "BigModel-only", "GLM-5.2"].map((modelId) => ({
+        modelId,
+        config: {
+          enabled: true,
+
+          properties: {
+            requiresMfjsToolSchema: false,
+            contextWindow: 200000,
+            inputFormat: {
+              supportsText: true,
+              supportsImage: false,
+              supportsVideo: false,
+              supportsAudio: false,
+              supportsPdf: false,
+            },
+            outputFormat: { supportsText: true },
+            supportsToolCall: true,
+            supportsJsonSchemaOutput: false,
+            supportsNativeWebSearch: false,
+            supportsMidConversationSystem: false,
+          },
+          optionSpecs: {
+            reasoningLevel: { values, map: "{}" },
+            maxOutputTokens: { max: 32000, map: "{}" },
+          },
+        },
+      })),
+    })),
+  };
+}

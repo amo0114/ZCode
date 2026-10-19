@@ -2,11 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  ProviderConfigService,
-  ProviderRegistryService,
-  createFailClosedAccountProviderConfigSnapshot,
-} from "@zcode/provider";
+import { ProviderConfigService, ProviderRegistryService } from "@zcode/provider";
 import {
   NodeZCodeBuiltinProviderConfigSource,
   EndpointScopedZCodeBuiltinSource,
@@ -105,12 +101,8 @@ describe("ZCode Built-in Release", () => {
               {
                 providerId: "builtin:zapi",
                 config: {
-                  group: "zai-family",
-                  access: {
-                    type: "zhipu-account",
-                    accountType: "zai",
-                    mode: "start-plan",
-                  },
+                  group: "standard-personal",
+                  access: { type: "api-key" },
                   builtinModelIds: ["retired-model"],
                 },
               },
@@ -431,13 +423,7 @@ describe("ZCode Built-in Release", () => {
       zcodeBuiltinSource: source,
       personalRepository: personal,
     });
-    const registry = new ProviderRegistryService({
-      configSource: config,
-      accountSource: {
-        read: async () => createFailClosedAccountProviderConfigSnapshot(await config.read()),
-        onDidChange: () => () => {},
-      },
-    });
+    const registry = new ProviderRegistryService({ configSource: config });
     try {
       await source.refresh({ force: true });
       await registry.start();
@@ -446,7 +432,6 @@ describe("ZCode Built-in Release", () => {
       await source.refresh({ force: true });
       const second = await registry.refresh("endpoint-switch");
       expect(second.sourceRevisions.config).not.toBe(first.sourceRevisions.config);
-      expect(second.account.basedOnZCodeBuiltinRevision).toBe(second.config.zcodeBuiltinRevision);
       expect(second.resolution.resolvedProviders[0]?.models.map((model) => model.modelId)).toEqual([
         "model-b",
       ]);
@@ -603,12 +588,8 @@ function releaseObject(revision: number, modelId: string) {
           {
             providerId: "builtin",
             config: {
-              group: "zai-family",
-              access: {
-                type: "zhipu-account",
-                accountType: "zai",
-                mode: "start-plan",
-              },
+              group: "standard-personal",
+              access: { type: "api-key" },
               builtinModelIds: [modelId],
             },
           },

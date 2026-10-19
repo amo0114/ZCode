@@ -33,7 +33,9 @@ describe("createHomeOnlyWebRemoteControlServices", () => {
     const { createHomeOnlyWebRemoteControlServices } = await import("../src/main.js");
     const services = createHomeOnlyWebRemoteControlServices();
 
-    await expect(services.oauthService.restoreCachedSession()).resolves.toBeNull();
+    await expect(services.oauthService.restoreCachedSessionState()).resolves.toEqual({
+      status: "signed-out",
+    });
     await expect(services.modelSelectionService.getView()).resolves.toEqual({
       revision: 0,
       providers: [],

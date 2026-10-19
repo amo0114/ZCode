@@ -217,7 +217,7 @@ describe("R1 window Host control protocol", () => {
     expect(
       hostResponseMessageSchema.safeParse({
         type: HostResponseTypes.ProviderProvisioningSourceChanged,
-        trigger: "credential",
+        trigger: "configured-default",
       }).success,
     ).toBe(true);
     expect(

@@ -44,8 +44,7 @@ describe("retry budget predicates", () => {
     expect(UNBOUNDED_RETRY_MAX_ATTEMPTS).toBe(0);
   });
 
-  // docs/highspeed/highspeed-card-spec.md §2.2「加速请求 0 次重试」：single-attempt 只把本次请求的
-  // maxAttempts 收敛为 1，其余闸门与状态事件如实读这个值。
+  // single-attempt 只把本次请求的 maxAttempts 收敛为 1，其余闸门与状态事件如实读这个值。
   it("single-attempt budget collapses maxAttempts to 1 and reports it as-is", () => {
     const resolved = { ...RETRY, backoffFactor: 2 };
     expect(isSingleAttemptRetryBudget(ModelRetryBudget.SingleAttempt)).toBe(true);

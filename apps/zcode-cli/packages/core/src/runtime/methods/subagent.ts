@@ -214,9 +214,6 @@ export function createDefaultSubagentPort(
       const childClientPorts = deriveChildClientPorts(
         {
           permissionBroker: this.permissionBroker,
-          ...(this.providerRuntimeHeadersPort === undefined
-            ? {}
-            : { providerRuntimeHeadersPort: this.providerRuntimeHeadersPort }),
         },
         {
           agentId: request.agentId,
@@ -528,7 +525,6 @@ function createSubagentOverrideModelFactory(
     return fallbackFactory({
       ...target,
       selection: override.selection,
-      requestDependencies: override.requestDependencies,
     });
   };
 }

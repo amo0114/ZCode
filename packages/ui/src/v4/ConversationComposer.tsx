@@ -27,8 +27,6 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/components/lib/utils.js";
-import { HighspeedComposerBackground } from "@/highspeed/HighspeedActivationVisual.js";
-import { useHighspeedComposerEntrance } from "@/highspeed/useHighspeedComposerEntrance.js";
 import {
   TID_CHAT_ATTACHMENT_BUTTON,
   TID_CHAT_ATTACHMENT_MENU_ITEM,
@@ -43,8 +41,6 @@ import {
   TID_V4_ATTACHMENT_UPLOAD_RETRY,
   TID_V4_STOP,
   testId,
-  type HighspeedCardSnapshot,
-  type PlanIdentitySnapshot,
   type ZCodeProvider,
 } from "@zcode/shared";
 import type {
@@ -402,14 +398,6 @@ export interface ConversationComposerProps {
    */
   blockingRequestId?: string | null;
   disabled?: boolean;
-  /** 当前 Task 可用的 Highspeed 卡；只影响静态标识和模型锁定。 */
-  highspeedCard?: HighspeedCardSnapshot | null;
-  /**
-   * 发送路径 draw 新命中登记的一次性激活请求（值为 cardId）。
-   * 命中当前卡时才播放激活动效，composer 锁定入场方式后经回调消费；切回、恢复与重挂载不重播。
-   */
-  highspeedActivationCardId?: string | null;
-  onHighspeedActivationApplied?: (cardId: string) => void;
   /**
    * 是否在新建任务 / 切换会话 / 挂载后自动把光标聚焦到输入框（默认开）。
    * 竖切多 pane 时由宿主传入 SessionPane.focused，仅焦点 pane 聚焦、后台 pane 不抢焦点。
@@ -434,8 +422,6 @@ export interface ConversationComposerProps {
   provider?: ZCodeProvider;
   /** 宿主 pane 与 workspace 遮罩共同裁决的真实可见性，仅用于 visible-only telemetry。 */
   telemetryVisible?: boolean;
-  /** 点击发送时读取套餐身份；二次确认会继续复用同一份冻结 seed。 */
-  readPlanIdentitySnapshot?: () => PlanIdentitySnapshot;
   onSendText: (
     text: string,
     options?: ConversationComposerSendOptions,
@@ -474,7 +460,6 @@ export interface ConversationComposerProps {
   onDismissError?: () => void;
   /** 无可用模型横幅的恢复动作；由 SessionPane 注入壳层导航，组件不直接操作 tab。 */
   onOpenModelSettings?: () => void;
-  onOpenModelUpgrade?: () => void;
   onOpenCodeViewer?: (source: CodeViewerSource) => void;
   /**
    * 是否监听全局「加入对话」事件（workspace file tree / 画板按钮）。
@@ -522,9 +507,6 @@ function ConversationComposerImpl({
   centered = false,
   blockingRequestId = null,
   disabled = false,
-  highspeedCard = null,
-  highspeedActivationCardId = null,
-  onHighspeedActivationApplied,
   autoFocusEnabled = true,
   isWebRemoteControl = false,
   workspacePath,
@@ -539,7 +521,6 @@ function ConversationComposerImpl({
   onRuntimeLifecycle,
   provider,
   telemetryVisible = true,
-  readPlanIdentitySnapshot,
   onSendText,
   onTextChange,
   onDraftStateChange,
@@ -555,7 +536,6 @@ function ConversationComposerImpl({
   error,
   onDismissError,
   onOpenModelSettings,
-  onOpenModelUpgrade,
   onOpenCodeViewer,
   listenAddToChatEvents = true,
   externalTextInsertRequest = null,
@@ -578,32 +558,6 @@ function ConversationComposerImpl({
   const configPickerScopeKey = `${workspaceKey}\0${draftScopeId}`;
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
-  const [presentedHighspeedCardId, setPresentedHighspeedCardId] = useState<string | null>(null);
-  const [highspeedSweepActive, setHighspeedSweepActive] = useState(false);
-  const highspeedCardId = highspeedCard?.cardId ?? null;
-  const highspeedEntrance = useHighspeedComposerEntrance({
-    cardId: highspeedCardId,
-    activationCardId: highspeedActivationCardId,
-    onActivationApplied: onHighspeedActivationApplied,
-  });
-  const highspeedEntranceAnimated = highspeedEntrance === "activation";
-  // 恢复入场（切回 Task、快照恢复、重挂载）不经扩散交接，卡片出现即呈现模型与倒计时。
-  const highspeedPresented =
-    highspeedCardId !== null &&
-    (!highspeedEntranceAnimated || presentedHighspeedCardId === highspeedCardId);
-  const handleHighspeedModelTransitionStart = useCallback(() => {
-    // 只记录已完成视觉交接的卡片身份，不改变卡片有效性或发送状态。
-    setPresentedHighspeedCardId(highspeedCardId);
-  }, [highspeedCardId]);
-  useEffect(() => {
-    // 扫光属于激活动效，只在 draw 新命中的交接后播放一次。
-    if (!highspeedPresented || !highspeedEntranceAnimated) {
-      setHighspeedSweepActive(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setHighspeedSweepActive(true), 1_900);
-    return () => window.clearTimeout(timer);
-  }, [highspeedEntranceAnimated, highspeedPresented]);
   const [configPickerState, setConfigPickerState] = useState<{
     scopeKey: string;
     activePicker: V4ComposerConfigPicker | null;
@@ -1306,7 +1260,6 @@ function ConversationComposerImpl({
             configProvider: telemetryConfig?.provider,
             agentProvider: provider,
             providerBaseURL: resolveProviderBaseURL(telemetryConfig?.provider, modelSelectionView),
-            planIdentitySnapshot: readPlanIdentitySnapshot?.(),
           }),
         };
         const sendTrigger = sendTriggerRef.current;
@@ -1556,7 +1509,6 @@ function ConversationComposerImpl({
       onSendText,
       pendingShareContext,
       provider,
-      readPlanIdentitySnapshot,
       removeCodeCommentContext,
       removeConversationSelectionReference,
       removePptxElementReference,
@@ -2177,12 +2129,6 @@ function ConversationComposerImpl({
             draftConfig={draftConfig}
             usage={composerUsage}
             disabled={disabled}
-            modelLocked={highspeedCard !== null}
-            highspeedPresented={highspeedPresented}
-            highspeedEntranceAnimated={highspeedEntranceAnimated}
-            highspeedSweepActive={highspeedSweepActive}
-            highspeedExpiresAt={highspeedCard?.expiresAt}
-            highspeedModel={highspeedCard?.model}
             activeConfigPicker={activeConfigPicker}
             onConfigPickerOpenChange={handleConfigPickerOpenChange}
             onSelectModel={handleSelectModelTrace}
@@ -2240,10 +2186,6 @@ function ConversationComposerImpl({
       handleStopClick,
       handleSendButtonClick,
       handleConfigPickerOpenChange,
-      highspeedCard,
-      highspeedEntranceAnimated,
-      highspeedPresented,
-      highspeedSweepActive,
       isWebRemoteControl,
       mode,
       handleSelectModelTrace,
@@ -2360,27 +2302,15 @@ function ConversationComposerImpl({
             error={visibleError}
             onDismiss={onDismissError}
             onOpenModelSettings={onOpenModelSettings}
-            onOpenUpgrade={onOpenModelUpgrade}
           />
         </div>
       ) : null}
       <div
-        data-highspeed-composer={highspeedCard ? "true" : undefined}
-        data-highspeed-entrance={highspeedCard ? highspeedEntrance : undefined}
         className={cn(
           "chat-composer-input-surface relative w-full",
           contextHeader && "rounded-2xl bg-surface shadow-xl/5",
-          highspeedCard && "highspeed-composer-surface",
-          highspeedPresented && "highspeed-placeholder-presented",
         )}
       >
-        {highspeedCard ? (
-          <HighspeedComposerBackground
-            key={highspeedCard.cardId}
-            animated={highspeedEntranceAnimated}
-            onModelTransitionStart={handleHighspeedModelTransitionStart}
-          />
-        ) : null}
         {contextHeader ? (
           // 旧 ChatViewComposer contextHeaderContent 同款包装（workspace 菜单 + Git 分支）。
           <div className="relative z-10 p-1.5 flex min-w-0 flex-wrap items-center gap-0">
@@ -2438,11 +2368,6 @@ function ConversationComposerImpl({
           leadingActions={leadingActionsNode}
           submitControl={submitControlNode}
           className="p-0"
-          shellClassName={
-            highspeedCard
-              ? "relative z-10 !rounded-none !border-0 !bg-transparent !transition-none hover:!border-transparent focus-within:!border-transparent focus-within:!bg-transparent"
-              : undefined
-          }
           onChange={handleEditorChange}
           onFocus={handleEditorFocus}
           onSubmit={handleEditorSubmit}

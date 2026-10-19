@@ -128,8 +128,7 @@ const toolResultDisplaySchema = z.discriminatedUnion("kind", [
       .min(1)
       .max(4 * 1024)
       .optional(),
-    // 与 toolCallMcpDisplaySchema 同源：不在这里声明，zod 会把 agent 下发的 unavailable
-    // 静默 strip 掉，官方 MCP 额度提示在 v4 链路上失效（同本文件顶部 display strip 的坑）。
+    // 与 toolCallMcpDisplaySchema 同源：仅为历史 row 校验保留。
     unavailable: z
       .object({ code: z.enum(OFFICIAL_MCP_TOOL_ERROR_CODES) })
       .strict()
@@ -263,10 +262,8 @@ const toolCallMcpDisplaySchema = z
       .max(4 * 1024)
       .optional(),
     /**
-     * 官方 Server MCP 判定本次调用不可用（额度耗尽 / 无 Coding Plan）时下发的结构化标识。
-     * CLI 侧只在官方来源 + isError 时填充，UI 据此在输入框上方提示。
-     * 与 CLI contracts 的 mcpToolResultDisplayPayloadSchema 必须同步——两侧都是 strict，
-     * 少加一处会让整条 row 校验失败。
+     * 已下线官方 MCP 的历史字段；新结果不再写入，仅为历史 row 校验保留。
+     * 与 CLI contracts 的 mcpToolResultDisplayPayloadSchema 必须同步——两侧都是 strict。
      */
     unavailable: z
       .object({ code: z.enum(OFFICIAL_MCP_TOOL_ERROR_CODES) })

@@ -1,5 +1,7 @@
 # Provider 重构 Working Memory
 
+> **智谱账号体系（BigModel / Z.ai 登录、Start / Coding / Team Plan、闲时、Highspeed、`zhipu-account` 接入）已于 2026-10 移除**，本目录保留为历史记录，不再是当前事实源。见 `docs/oauth/zhipu-account-removal-plan.md`。
+
 > 状态：主体实现收口，进入整体验证
 >
 > 最近更新：2026-09-09

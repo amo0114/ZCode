@@ -37,10 +37,10 @@ function createSettingsView(): ProviderSettingsView {
 }
 
 describe("Provider API Key Personal persistence", () => {
-  it("恢复手动套餐 Key 保留类型，不要求账号连接", async () => {
+  it("恢复模板 Provider 的 API Key 保留类型", async () => {
     const view = createSettingsView();
     view.providers[0]!.effectiveConfig.access = {
-      type: "zhipu-coding-plan-api-key",
+      type: "api-key",
       apiKey: "old",
     };
     const save = vi.fn();
@@ -52,7 +52,7 @@ describe("Provider API Key Personal persistence", () => {
     });
     expect(save).toHaveBeenCalledWith("zai-api", {
       label: "My Z.ai",
-      access: { type: "zhipu-coding-plan-api-key", apiKey: "new" },
+      access: { type: "api-key", apiKey: "new" },
     });
   });
   it("只覆盖 Personal API Key，不复制 Official Effective 字段", async () => {

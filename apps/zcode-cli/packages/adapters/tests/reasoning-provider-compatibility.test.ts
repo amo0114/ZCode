@@ -3,27 +3,16 @@ import { createModelId, createModelProviderId, type ModelInputMessage } from "@z
 import { normalizeReasoningHistory } from "../src/model/reasoning-history-normalization.js";
 
 const MODEL_ID = createModelId("GLM-5.3");
-const PROVIDER_GROUPS = [
-  ["builtin:zai-coding-plan", "account:zai-individual-coding-plan", "account:zai-team-coding-plan"],
-  [
-    "builtin:bigmodel-coding-plan",
-    "account:bigmodel-individual-coding-plan",
-    "account:bigmodel-team-coding-plan",
-  ],
-];
-const compatiblePairs = PROVIDER_GROUPS.flatMap((group) =>
-  group.flatMap((source) => group.map((target) => [source, target] as const)),
-);
-
 describe("reasoning replay provider identity", () => {
-  it.each(compatiblePairs)("preserves history and cache metadata: %s -> %s", (source, target) => {
-    const messages = history(source);
+  it("preserves history and cache metadata for the same provider identity", () => {
+    const messages = history("custom-a");
     const before = structuredClone(messages);
-    expect(normalizeReasoningHistory(messages, identity(target))).toBe(messages);
+    expect(normalizeReasoningHistory(messages, identity("custom-a"))).toBe(messages);
     expect(messages).toEqual(before);
   });
 
   it.each([
+    ["builtin:zai-coding-plan", "account:zai-individual-coding-plan"],
     ["builtin:zai-coding-plan", "account:bigmodel-individual-coding-plan"],
     ["builtin:bigmodel-coding-plan", "account:zai-team-coding-plan"],
     ["account:zai-team-coding-plan", "account:bigmodel-team-coding-plan"],
@@ -39,14 +28,10 @@ describe("reasoning replay provider identity", () => {
     expectStripped(history(target), identity(source));
   });
 
-  it.each(compatiblePairs)("still strips across model IDs: %s -> %s", (source, target) => {
-    expectStripped(history(source), { ...identity(target), modelId: createModelId("GLM-5.2") });
+  it("still strips across model IDs", () => {
+    expectStripped(history("custom-a"), { ...identity("custom-a"), modelId: createModelId("GLM-5.2") });
   });
 
-  it("keeps identical custom provider identities compatible", () => {
-    const messages = history("custom-a");
-    expect(normalizeReasoningHistory(messages, identity("custom-a"))).toBe(messages);
-  });
 });
 
 function identity(providerId: string) {

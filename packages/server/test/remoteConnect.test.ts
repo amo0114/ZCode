@@ -316,18 +316,14 @@ describe("connectRemote", () => {
       remoteRuntimeEnv: {
         ZCODE_ENV: "test",
         ZCODE_BASE_URL: "https://zcode.z.ai/api/v1",
-        ZAI_OAUTH_ORIGIN: "https://chat.z.ai",
-        ZAI_OAUTH_CLIENT_ID: "client_'test",
-        ZAI_OAUTH_APP_SECRET: "must-not-cross-ssh",
+        ZCODE_UNLISTED_SECRET: "must-not-cross-ssh",
       },
     });
     connection.dispose();
 
     expect(backend.commands[0]).toContain("ZCODE_ENV='test'");
     expect(backend.commands[0]).toContain("ZCODE_BASE_URL='https://zcode.z.ai/api/v1'");
-    expect(backend.commands[0]).toContain("ZAI_OAUTH_ORIGIN='https://chat.z.ai'");
-    expect(backend.commands[0]).toContain(`ZAI_OAUTH_CLIENT_ID='client_'"'"'test'`);
-    expect(backend.commands[0]).not.toContain("ZAI_OAUTH_APP_SECRET");
+    expect(backend.commands[0]).not.toContain("ZCODE_UNLISTED_SECRET");
     expect(backend.commands[0]).not.toContain("must-not-cross-ssh");
   });
 

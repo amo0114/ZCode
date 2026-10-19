@@ -14,7 +14,6 @@ import {
   type ZCodeProtocolSessionRecord,
 } from "./server-types.js";
 import { runSessionModelConfigMutation } from "../zcode-protocol-v4/model-config-mutation.js";
-import { createProviderRuntimeHeadersPort } from "./provider-runtime-headers.js";
 
 export async function readWorkspacePresentation(
   context: ZCodeProtocolAgentServerContext,
@@ -71,13 +70,10 @@ export async function createWorkspaceZCodeApp(
   workspace: ZCodeWorkspaceRef,
   options: Omit<ZCodeAppOptions, "providerRegistry">,
 ): Promise<ZCodeApp> {
-  const providerRuntimeHeadersPort =
-    options.providerRuntimeHeadersPort ?? createProviderRuntimeHeadersPort(context, workspace);
   return context.deps.createZCodeApp({
     ...options,
     includeVisualize: true,
     platform: context.deps.platform,
-    providerRuntimeHeadersPort,
     runtimeConfig: {
       ...options.runtimeConfig,
       // createZCodeApp 会把 workingDirectory 规范化为执行 cwd。把协议入口的

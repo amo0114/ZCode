@@ -207,9 +207,9 @@ describe("Todo104 最终规则数据合同", () => {
       },
     };
     const builtin = {
-      providerId: "account:zai",
+      providerId: "builtin:zai",
       providerName: "Z.ai",
-      config: { group: "zai-family" },
+      config: { group: "standard-personal" },
     };
     expect(
       builtinProviderConfigRulesSchema.parse({
@@ -263,22 +263,12 @@ describe("Todo104 最终规则数据合同", () => {
       }).success,
     ).toBe(false);
     expect(
-      personalProviderConfigRulesSchema.safeParse({
-        providerRules: [
-          {
-            providerId: "account:zai",
-            config: { access: { type: "api-key", apiKey: "not-allowed" } },
-          },
-        ],
-      }).success,
-    ).toBe(false);
-    expect(
       personalProviderConfigRulesSchema.safeParse({ templateRules: [], providerRules: [] }).success,
     ).toBe(false);
   });
 
   it("同来源重复 Provider/Template 在建索引前拒绝；Match 同时命中仍合法", () => {
-    const provider = { providerId: "test", config: { group: "zai-family" } };
+    const provider = { providerId: "test", config: { group: "standard-personal" } };
     const template = { templateId: "test", templateNameMap: {}, config: {} };
     expect(
       builtinProviderConfigRulesSchema.safeParse({

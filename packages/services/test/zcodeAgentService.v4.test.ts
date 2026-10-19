@@ -577,7 +577,6 @@ describe("zcodeAgentService v4 conversation channel", () => {
       expect(conversation.ack.openTiming).toMatchObject({
         version: 1,
         hostPrepareMs: expect.any(Number),
-        providerRegistrySyncMs: expect.any(Number),
         taskMetaReadMs: expect.any(Number),
         cliRequestMs: expect.any(Number),
       });

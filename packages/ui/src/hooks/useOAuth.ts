@@ -6,16 +6,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OAuthProviderId, OAuthProviderMeta } from "@zcode/shared";
-import {
-  BIGMODEL_PROVIDER_ID,
-  isCredentialDecryptError,
-  resolveSafeTelemetryHostname,
-  ZAI_PROVIDER_ID,
-} from "@zcode/shared";
+import { isCredentialDecryptError, resolveSafeTelemetryHostname } from "@zcode/shared";
 import { reportAppTelemetryEvent } from "@/lib/appTelemetry.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
-import type { LoginEntryPurpose } from "@/store/index.js";
-import { useZCodeStore } from "@/store/StoreProvider.js";
 import { logger } from "../logger.js";
 import { usePlatform } from "./usePlatform.js";
 import { useServices } from "./useServices.js";
@@ -33,7 +26,6 @@ export function useOAuth() {
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [pendingProvider, setPendingProvider] = useState<OAuthProviderId | null>(null);
   const loginAttemptRef = useRef(0);
-  const setOAuthPollingActive = useZCodeStore((state) => state.setOAuthPollingActive);
 
   const refreshProviders = useCallback(async () => {
     try {
@@ -69,7 +61,7 @@ export function useOAuth() {
   }, [refreshProviders]);
 
   const startLogin = useCallback(
-    async (provider: OAuthProviderId, options: { purpose?: LoginEntryPurpose } = {}) => {
+    async (provider: OAuthProviderId) => {
       const loginAttempt = ++loginAttemptRef.current;
       try {
         setStatus("waiting");
@@ -80,16 +72,13 @@ export function useOAuth() {
           authorizeUrl,
           state,
           provider: startedProvider,
-        } = await oauthService.startOAuthWithPolling(provider);
+        } = await oauthService.startOAuth(provider);
 
         if (loginAttemptRef.current !== loginAttempt) {
           return;
         }
 
         platform.registerOAuthState({ state, provider: startedProvider });
-        setOAuthPollingActive(
-          startedProvider === ZAI_PROVIDER_ID || startedProvider === BIGMODEL_PROVIDER_ID,
-        );
         platform.openExternal(authorizeUrl);
         void reportAppTelemetryEvent(
           platform,
@@ -107,15 +96,13 @@ export function useOAuth() {
 
         logger.info("[useOAuth] OAuth 流程已启动，等待浏览器回调", {
           provider: startedProvider,
-          purpose: options.purpose ?? "app-login",
         });
       } catch (err) {
-        // 旧 init 的失败可能晚于新登录成功返回，不能反向关闭新 flow 的轮询或覆盖 UI。
+        // 旧 start 的失败可能晚于新一次登录返回，不能覆盖新 flow 的 UI。
         if (loginAttemptRef.current !== loginAttempt) {
           return;
         }
         logger.error("[useOAuth] 启动 OAuth 失败:", err);
-        setOAuthPollingActive(false);
         setStatus("error");
         // OAuth 启动失败也属于登录失败，不把服务端或平台错误原文展示给用户。
         // 原文通过 i18n 渲染，避免登录页出现 provider/token 等具体失败原因。
@@ -123,19 +110,18 @@ export function useOAuth() {
         setPendingProvider(null);
       }
     },
-    [intl, oauthService, platform, setOAuthPollingActive],
+    [intl, oauthService, platform],
   );
 
   const cancel = useCallback(
     async (provider?: OAuthProviderId) => {
       loginAttemptRef.current += 1;
       await oauthService.cancelPending(provider);
-      setOAuthPollingActive(false);
       setStatus("idle");
       setError(null);
       setPendingProvider(null);
     },
-    [oauthService, setOAuthPollingActive],
+    [oauthService],
   );
 
   const reset = useCallback(() => {

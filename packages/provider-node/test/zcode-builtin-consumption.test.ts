@@ -2,7 +2,6 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  AccountProviderService,
   ApiKeyAccessConfig,
   ModelConfigRules,
   ProviderApiConfig,
@@ -37,18 +36,10 @@ it("更新只改变后续 Registry 消费，Personal 覆盖/历史选择与已�
     watch: false,
   });
   await source.read();
-  let account!: AccountProviderService;
   const runtime = new NodeProviderRegistryRuntime({
     zcodeBuiltinFilePath: active,
     personalFilePath: personal,
     personalPollingIntervalMs: false,
-    createAccountSource(configSource) {
-      account = new AccountProviderService({
-        configSource,
-        resolve: async () => ({ providers: ProviderConfigMap.empty(), states: {} }),
-      });
-      return account;
-    },
   });
   try {
     await runtime.personalRepository.update(() => ({
@@ -103,7 +94,6 @@ it("更新只改变后续 Registry 消费，Personal 覆盖/历史选择与已�
     expect(await readFile(personal, "utf8")).toBe(beforeFile);
   } finally {
     runtime.dispose();
-    account?.dispose();
     source.dispose();
     await rm(root, { recursive: true, force: true });
   }

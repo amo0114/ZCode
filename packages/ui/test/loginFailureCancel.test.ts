@@ -11,7 +11,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TID_OAUTH_CANCEL, TID_OAUTH_ERROR, TID_OAUTH_LOGIN_BUTTON } from "@zcode/shared";
+import { TID_OAUTH_CANCEL, TID_OAUTH_ERROR, TID_OAUTH_LOGIN_BUTTON, testId } from "@zcode/shared";
 
 const oauthState = vi.hoisted(() => ({
   status: "idle" as "idle" | "waiting" | "error",
@@ -31,7 +31,6 @@ const oauthActions = vi.hoisted(() => ({
 const storeState = vi.hoisted(() => ({
   oauthError: null as string | null,
   setOAuthError: vi.fn(),
-  markLoginEntryAttemptStatus: vi.fn(),
 }));
 
 // 登录壳新增窗控；夹具提供平台命令，继续聚焦 OAuth 失败/取消交互。
@@ -68,14 +67,10 @@ vi.mock("@/store/StoreProvider.js", () => ({
       user: null,
       oauthError: storeState.oauthError,
       setOAuthError: storeState.setOAuthError,
-      oauthSuccessSeq: 0,
-      lastOAuthSuccessProvider: null,
-      loginEntryRequest: null,
-      loginEntryAttempt: null,
-      clearLoginEntryRequest: vi.fn(),
-      markLoginEntryAttemptStatus: storeState.markLoginEntryAttemptStatus,
     }),
 }));
+
+const FIRST_LOGIN_BUTTON = testId(TID_OAUTH_LOGIN_BUTTON, "bigmodel");
 
 async function renderWelcomeScreen() {
   const { WelcomeScreen } = await import("@/WelcomeScreen.js");
@@ -92,7 +87,6 @@ describe("登录失败态的取消交互", () => {
     oauthActions.cancel.mockClear();
     oauthActions.reset.mockClear();
     storeState.setOAuthError.mockClear();
-    storeState.markLoginEntryAttemptStatus.mockClear();
   });
 
   afterEach(() => {
@@ -113,7 +107,7 @@ describe("登录失败态的取消交互", () => {
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     // 失败态整体替换渠道列表,用户通过取消回到列表换渠道
-    expect(screen.queryByTestId(TID_OAUTH_LOGIN_BUTTON)).toBeNull();
+    expect(screen.queryByTestId(FIRST_LOGIN_BUTTON)).toBeNull();
   });
 
   it("Root 层 oauthError 触发的失败态同样替换渠道列表,不再与按钮列表同屏", async () => {
@@ -126,7 +120,7 @@ describe("登录失败态的取消交互", () => {
 
     expect(screen.getByTestId(TID_OAUTH_ERROR)).toBeTruthy();
     expect(screen.getByTestId(TID_OAUTH_CANCEL)).toBeTruthy();
-    expect(screen.queryByTestId(TID_OAUTH_LOGIN_BUTTON)).toBeNull();
+    expect(screen.queryByTestId(FIRST_LOGIN_BUTTON)).toBeNull();
   });
 
   it("点击失败态取消:清 store 错误并取消 pending,状态回 idle 后渠道列表恢复", async () => {
@@ -144,7 +138,7 @@ describe("登录失败态的取消交互", () => {
     storeState.oauthError = null;
     view.rerender(createElement(WelcomeScreen, { onComplete: vi.fn() }));
 
-    expect(screen.getByTestId(TID_OAUTH_LOGIN_BUTTON)).toBeTruthy();
+    expect(screen.getByTestId(FIRST_LOGIN_BUTTON)).toBeTruthy();
     expect(screen.queryByTestId(TID_OAUTH_ERROR)).toBeNull();
     expect(screen.queryByTestId(TID_OAUTH_CANCEL)).toBeNull();
   });
@@ -156,10 +150,7 @@ describe("登录失败态的取消交互", () => {
 
     expect(storeState.setOAuthError).toHaveBeenCalledWith(null);
     // retry 未记录 lastAttempt 时回退到渠道列表首位
-    expect(oauthActions.startLogin).toHaveBeenCalledWith(
-      expect.stringMatching(/^(bigmodel|zai)$/u),
-      undefined,
-    );
+    expect(oauthActions.startLogin).toHaveBeenCalledWith("bigmodel");
   });
 
   it("等待态取消按钮与失败态取消并存不冲突:等待态只有取消,无错误提示", async () => {
@@ -170,6 +161,6 @@ describe("登录失败态的取消交互", () => {
 
     expect(screen.getByTestId(TID_OAUTH_CANCEL)).toBeTruthy();
     expect(screen.queryByTestId(TID_OAUTH_ERROR)).toBeNull();
-    expect(screen.queryByTestId(TID_OAUTH_LOGIN_BUTTON)).toBeNull();
+    expect(screen.queryByTestId(FIRST_LOGIN_BUTTON)).toBeNull();
   });
 });

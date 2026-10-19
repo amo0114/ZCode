@@ -1,5 +1,5 @@
 /* oxlint-disable eslint(max-lines) -- provider 卡片同时承载名称、连接、鉴权、模型和映射编辑；本阶段先维持单组件，后续再按表单域拆分。 */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getProviderFormApiKey,
   getProviderFormLabel,
@@ -24,7 +24,6 @@ import {
   ProviderConnectionSection,
   ProviderModelsSection,
 } from "./ProviderCardSections.js";
-import { resolveModelProviderDisplayName } from "./constants.js";
 import { useProviderDetailFeedback } from "./ProviderDetailFeedback.js";
 import { MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS, useIdleTrigger } from "./useIdleTrigger.js";
 import { useOptimisticReorder } from "./useOptimisticReorder.js";
@@ -150,10 +149,7 @@ export function InlineEditableProviderCard({
   readOnlyEndpoints,
   presetApiKeyUrl,
   onOpenPresetApiKey,
-  statusSection,
   nameEditable,
-  headerVisible = true,
-  headerActionsVisible,
   settingsRevision,
 }: {
   provider: ProviderSettingsFormProvider;
@@ -177,10 +173,7 @@ export function InlineEditableProviderCard({
   readOnlyEndpoints?: boolean;
   presetApiKeyUrl?: string;
   onOpenPresetApiKey?: () => void;
-  statusSection?: ReactNode;
   nameEditable?: boolean;
-  headerVisible?: boolean;
-  headerActionsVisible?: boolean;
   settingsRevision?: number;
 }) {
   const { intl } = useZCodeIntl();
@@ -214,7 +207,7 @@ export function InlineEditableProviderCard({
   const dirtyProviderFieldsRef = useRef(new Set<keyof ProviderDraftValues>());
   const draftRevisionRef = useRef(0);
   const lastSubmittedDraftSignatureRef = useRef<string | null>(null);
-  const providerDisplayName = resolveModelProviderDisplayName(provider);
+  const providerDisplayName = getProviderFormLabel(provider);
   const saveNotificationRef = useRef({
     providerId: provider.providerId,
     providerDisplayName,
@@ -748,83 +741,72 @@ export function InlineEditableProviderCard({
   }, [onDelete]);
 
   const headerProviderName = providerDisplayName;
-  const isAccountProvider = provider.config.access?.type === "zhipu-account";
   const isApiKeyProvider = isApiKeyAccess(provider.config.access);
-  const effectiveHeaderVisible = headerVisible && statusSection === undefined;
 
   return (
     <div className="space-y-3">
-      {effectiveHeaderVisible ? (
-        <ProviderCardHeader
-          providerName={headerProviderName}
-          logo={provider.config.logo}
-          editingName={editingName}
-          nameValue={nameValue}
-          nameInputRef={nameInputRef}
-          nameEditable={nameEditable}
-          onNameChange={handleNameValueChange}
-          onNameBlur={handleNameBlur}
-          onNameKeyDown={handleNameKeyDown}
-          onNameCompositionStart={() => {
-            nameCompositionActiveRef.current = true;
-          }}
-          onNameCompositionEnd={() => {
-            nameCompositionActiveRef.current = false;
-          }}
-          onStartEditName={handleStartEditName}
-          onDelete={onDelete ? handleDeleteProvider : undefined}
-          actionsVisible={headerActionsVisible}
-          providerToggle={
-            isAccountProvider ? undefined : (
-              <ControlHintTooltip
-                standalone
-                title={intl.formatMessage({
+      <ProviderCardHeader
+        providerName={headerProviderName}
+        logo={provider.config.logo}
+        editingName={editingName}
+        nameValue={nameValue}
+        nameInputRef={nameInputRef}
+        nameEditable={nameEditable}
+        onNameChange={handleNameValueChange}
+        onNameBlur={handleNameBlur}
+        onNameKeyDown={handleNameKeyDown}
+        onNameCompositionStart={() => {
+          nameCompositionActiveRef.current = true;
+        }}
+        onNameCompositionEnd={() => {
+          nameCompositionActiveRef.current = false;
+        }}
+        onStartEditName={handleStartEditName}
+        onDelete={onDelete ? handleDeleteProvider : undefined}
+        providerToggle={
+          <ControlHintTooltip
+            standalone
+            title={intl.formatMessage({
+              id: provider.enabled
+                ? "settings.modelProvider.disableProvider"
+                : "settings.modelProvider.enableProvider",
+            })}
+          >
+            {/* Tooltip 的 data-state 不能覆盖 Switch 的 checked 状态，否则轨道样式会消失。 */}
+            <span className="inline-flex">
+              <Switch
+                // 共享开关左右各扩展 12px，会覆盖相邻菜单；本标题栏仅保留 4px 横向热区。
+                className="after:-inset-x-1"
+                data-testid="model-provider-enabled-switch"
+                aria-label={intl.formatMessage({
                   id: provider.enabled
                     ? "settings.modelProvider.disableProvider"
                     : "settings.modelProvider.enableProvider",
                 })}
-              >
-                {/* Tooltip 的 data-state 不能覆盖 Switch 的 checked 状态，否则轨道样式会消失。 */}
-                <span className="inline-flex">
-                  <Switch
-                    // 共享开关左右各扩展 12px，会覆盖相邻菜单；本标题栏仅保留 4px 横向热区。
-                    className="after:-inset-x-1"
-                    data-testid="model-provider-enabled-switch"
-                    aria-label={intl.formatMessage({
-                      id: provider.enabled
-                        ? "settings.modelProvider.disableProvider"
-                        : "settings.modelProvider.enableProvider",
-                    })}
-                    checked={provider.enabled}
-                    disabled={savingEnabled}
-                    onCheckedChange={(enabled) => {
-                      void handleProviderEnabledChange(enabled);
-                    }}
-                  />
-                </span>
-              </ControlHintTooltip>
-            )
-          }
-        />
-      ) : null}
-
-      {statusSection}
+                checked={provider.enabled}
+                disabled={savingEnabled}
+                onCheckedChange={(enabled) => {
+                  void handleProviderEnabledChange(enabled);
+                }}
+              />
+            </span>
+          </ControlHintTooltip>
+        }
+      />
 
       <div className="space-y-3">
-        {isAccountProvider ? null : (
-          <ProviderConnectionSection
-            provider={provider}
-            readOnly={readOnlyEndpoints}
-            apiFormat={apiFormat}
-            baseUrlValue={baseUrlValue}
-            onApiFormatChange={handleApiFormatChange}
-            onBaseUrlChange={handleBaseUrlValueChange}
-            onBaseUrlBlur={saveConnection}
-            onBaseUrlKeyDown={handleTextCommitKeyDown}
-            onBaseUrlCompositionStart={handleTechnicalInputCompositionStart}
-            onBaseUrlCompositionEnd={handleTechnicalInputCompositionEnd}
-          />
-        )}
+        <ProviderConnectionSection
+          provider={provider}
+          readOnly={readOnlyEndpoints}
+          apiFormat={apiFormat}
+          baseUrlValue={baseUrlValue}
+          onApiFormatChange={handleApiFormatChange}
+          onBaseUrlChange={handleBaseUrlValueChange}
+          onBaseUrlBlur={saveConnection}
+          onBaseUrlKeyDown={handleTextCommitKeyDown}
+          onBaseUrlCompositionStart={handleTechnicalInputCompositionStart}
+          onBaseUrlCompositionEnd={handleTechnicalInputCompositionEnd}
+        />
 
         {isApiKeyProvider ? (
           <ProviderApiKeySection
@@ -847,7 +829,6 @@ export function InlineEditableProviderCard({
           providerId={provider.providerId}
           providerName={getProviderFormLabel(provider)}
           providerEnabled={provider.enabled}
-          providerAccess={provider.config.access}
           models={models}
           onTestModel={onTestModel ? handleTestModel : undefined}
           onModelCommit={handleModelCommit}

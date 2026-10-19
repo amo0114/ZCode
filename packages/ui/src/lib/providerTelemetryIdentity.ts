@@ -1,18 +1,9 @@
 import { decodeCustomModelValue, encodeCustomModelValue } from "@zcode/shared";
 
 // Provider 重构拆分了执行身份，但旧报表仍按原桶统计；只在事件构造处使用，禁止回流业务配置。
-// 旧 staging 790884b1ce 的 Team 连接也使用 builtin:* 原 Coding Plan 身份。
 const legacyProviderIds: Readonly<Record<string, string>> = Object.freeze({
   "zai-api": "builtin:zai",
   "bigmodel-api": "builtin:bigmodel",
-  "account:zai-individual-coding-plan": "builtin:zai-coding-plan",
-  "account:zai-team-coding-plan": "builtin:zai-coding-plan",
-  "account:bigmodel-individual-coding-plan": "builtin:bigmodel-coding-plan",
-  "account:bigmodel-team-coding-plan": "builtin:bigmodel-coding-plan",
-  "account:zai-start-plan": "builtin:zai-start-plan",
-  "account:bigmodel-start-plan": "builtin:bigmodel-start-plan",
-  "account:zai-offpeak-idle-plan": "offpeak-idle-plan",
-  "account:bigmodel-offpeak-idle-plan": "offpeak-idle-plan",
 });
 
 export function legacyTelemetryProviderId(providerId: string): string {

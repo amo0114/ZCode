@@ -124,7 +124,6 @@ describe("Provider Template", () => {
     const resolution = new ProviderConfigResolver().resolve({
       zcodeBuiltinProviders: ProviderConfigMap.empty(),
       zcodeBuiltinProviderTemplates: new ProviderTemplateMap([["deepseek", template]]),
-      accountProviders: ProviderConfigMap.empty(),
       personalProviders,
       zcodeBuiltinModelRules: rules,
       personalModels: ModelConfigRules.empty(),

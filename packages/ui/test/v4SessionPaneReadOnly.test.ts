@@ -184,14 +184,6 @@ vi.mock("@/v4/V4InteractionDialogs.js", async () => {
   };
 });
 
-vi.mock("@/request-security-edition/V4ProviderRuntimeHeadersController.js", async () => {
-  const React = await import("react");
-  return {
-    V4ProviderRuntimeHeadersController: () =>
-      React.createElement("div", { "data-testid": "mock-runtime-headers" }),
-  };
-});
-
 function makeSnapshot(
   lastError: ConversationSnapshot["control"]["lastError"] = null,
 ): ConversationSnapshot {

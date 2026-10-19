@@ -3,12 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  ApiKeyAccessConfig,
-  ProviderConfig,
-  ProviderConfigMap,
-  ProviderConfigResolver,
-} from "@zcode/provider";
+import { ApiKeyAccessConfig, ProviderConfig, ProviderConfigResolver } from "@zcode/provider";
 import {
   NodePersonalProviderConfigRepository,
   NodeZCodeBuiltinProviderConfigSource,
@@ -103,7 +98,6 @@ describe("Todo 72 已发布 config.json 首次升级", () => {
         zcodeBuiltinModelRules: builtin.models,
         personalProviders: personal.providers,
         personalModels: personal.models,
-        accountProviders: ProviderConfigMap.empty(),
       });
       for (const family of ["bigmodel", "zai"] as const) {
         const id = `${family}-api`;
@@ -143,7 +137,6 @@ describe("Todo 72 已发布 config.json 首次升级", () => {
             .overlay(new ProviderConfig({ access: new ApiKeyAccessConfig({ apiKey: "" }) })),
         }),
         personalModels: personal.models,
-        accountProviders: ProviderConfigMap.empty(),
       });
       expect(missingKey.registryProviders.some((item) => item.providerId === customId)).toBe(false);
       await repository.update((current) => ({

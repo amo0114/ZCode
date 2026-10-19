@@ -3,7 +3,6 @@
 // 先让 Host 重发策略，再重读快照；首次读到的值只是基线，不发信号。多次变化按顺序串行。
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ICodingPlanSubscriptionService } from "@zcode/services";
 import {
   applyDynamicWorkflowUserMode,
   createDynamicWorkflowClientConfig,
@@ -28,20 +27,17 @@ function setup() {
     syncDynamicWorkflowUserMode: vi.fn(async (params: { mode?: DynamicWorkflowMode }) => {
       events.push(`sync:${params.mode ?? "follow"}`);
     }),
-  };
-  const codingPlanSubscriptionService = {
     getDynamicWorkflowClientConfig: vi.fn(async () => {
       events.push("reload");
       return applyDynamicWorkflowUserMode(OFFER, currentChoice);
     }),
-  } as unknown as ICodingPlanSubscriptionService;
+  };
   const hook = renderHook(
     (props: { settingsLoaded: boolean; userMode: DynamicWorkflowMode | undefined }) => {
       currentChoice = props.userMode;
       useDynamicWorkflowUserModeSync({
         ...props,
         zcodeAgentService,
-        codingPlanSubscriptionService,
       });
     },
     { initialProps: { settingsLoaded: false, userMode: undefined } },

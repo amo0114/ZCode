@@ -1,10 +1,4 @@
-export { cloudContentPayloadSchema, contentBundleSchema } from "./cloudContent.js";
 export * from "./networkCapture.js";
-export type {
-  CloudContentPayload,
-  CloudContentBundle,
-  CloudContentHeroType,
-} from "./cloudContent.js";
 export type {
   FileBinaryPreview,
   FileEntry,
@@ -85,7 +79,6 @@ export * from "./rendererActionTrace.js";
 export * from "./validation.js";
 export * from "./api.js";
 export * from "./zcode-protocol/index.js";
-export * from "./account-provider-state.js";
 // re-home：旧协议承重面的幸存文件（消费者继续走 barrel，零感知）
 export * from "./zcode-protocol-legacy-types.js";
 export * from "./zcode-task-types-core.js";
@@ -94,7 +87,6 @@ export * from "./remote-workspace-identity.js";
 export * from "./zcode-api-retry-status.js";
 export * from "./zcode-network-debug-status.js";
 export * from "./zcode-session-visible-content.js";
-export * from "./official-mcp-auth.js";
 export * from "./official-mcp-tool-error.js";
 export * from "./conversation-message-projection-policy.js";
 export * from "./conversation-share.js";
@@ -135,7 +127,6 @@ export * from "./helpAppConfig.js";
 export * from "./remoteAssetInstallMode.js";
 export * from "./onboardingRecord.js";
 export * from "./remoteResourcePackages.js";
-export * from "./plan-identity.js";
 export {
   BROWSER_SCREENSHOT_SURFACE_PREPARE_TIMEOUT_MS,
   BROWSER_VIEW_RESTORE_BOOTSTRAP_URL,
@@ -249,7 +240,6 @@ export type {
 export type { ZCodeTaskCreateResult } from "./zcode-task-types.js";
 export * from "./zcode-task-types.js";
 export * from "./automation-types.js";
-export * from "./off-peak-types.js";
 export * from "./background-task-control-merge.js";
 export * from "./background-task-controls.js";
 export * from "./background-task-notifications.js";
@@ -258,8 +248,6 @@ export * from "./zcode-agent-model-state.js";
 export * from "./task-realtime.js";
 export { formatTimestamp, formatLogPrefix } from "./log-format.js";
 export * from "./model-provider-types.js";
-export * from "./model-provider-family.js";
-export * from "./provider-family-connection-selection.js";
 export * from "./provider-provisioning.js";
 export * from "./custom-model-value.js";
 export * from "./model-selection-types.js";
@@ -299,7 +287,6 @@ export * from "./web-remote-control-rpc-transport.js";
 export * from "./settings-sync.js";
 export * from "./uuid.js";
 export * from "./usage-stats.js";
-export * from "./coding-plan-subscription.js";
 export * from "./forceUpdate.js";
 export * from "./intranetProbe.js";
 export * from "./intranetDefaults.js";
@@ -311,8 +298,6 @@ export * from "./workspaceSessionRestore.js";
 export * from "./skill-scan-policy.js";
 export * from "./browser-use/index.js";
 
-export * from "./coding-plan-reset.js";
-export * from "./highspeed.js";
 export {
   parseSubagentMarkdownSelection,
   formatSubagentMarkdownModel,
@@ -333,21 +318,8 @@ export * from "./localTtft.js";
 export * from "./pluginStoreOrder.js";
 export * from "./clientConfig.js";
 export * from "./pluginStoreOrdering.js";
-export * from "./marketingTouch.js";
-export * from "./rewardsEmbedded.js";
-export * from "./rewardsBridge.js";
 export * from "./session-debug.js";
 export { redactFeedbackText } from "./feedbackPrivacy.js";
-export { API_KEY_USAGE_SCENE, type ApiKeyCreationUsageScene } from "./api-key-usage-scene.js";
-export {
-  projectAccessTokenFingerprint,
-  ProjectAccessTokenTransientError,
-} from "./project-access-token.js";
-export {
-  ProjectAccessTokenClient,
-  type ProjectAccessTokenInput,
-  type ProjectAccessTokenMaterial,
-} from "./project-access-token-client.js";
 
 export * from "./conversationSelection.js";
 export * from "./attachment-source.js";

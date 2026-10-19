@@ -15,7 +15,6 @@ describe("显式 Subagent 选择使用注入的公共解析", () => {
 
   it.each([
     "selection-missing",
-    "account-connection-unavailable",
     "provider-not-found",
     "model-not-found",
     "reasoning-level-missing",
@@ -58,7 +57,7 @@ describe("显式 Subagent 选择使用注入的公共解析", () => {
         profileSelection: original,
         resolveSelection: (): EffectiveModelSelectionResult => ({
           effectiveSelection: null,
-          selectionIssue: "account-connection-unavailable",
+          selectionIssue: "provider-not-found",
         }),
       });
     } catch (error) {

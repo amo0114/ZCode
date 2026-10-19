@@ -1,10 +1,7 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ModelProviderSectionLayout,
-  shouldShowModelProviderRefreshLoading,
-} from "@/settings/model-provider-section/SectionLayout.js";
+import { ModelProviderSectionLayout } from "@/settings/model-provider-section/SectionLayout.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 
 vi.mock("@/settings/model-provider-section/Navigation.js", () => ({
@@ -16,31 +13,6 @@ vi.mock("@/ControlHintTooltip.js", () => ({
 }));
 
 describe("model provider section refresh button loading", () => {
-  it("preset 或 custom 分组加载中时，刷新按钮应显示 loading", () => {
-    expect(
-      shouldShowModelProviderRefreshLoading({
-        presetLoading: true,
-        customLoading: false,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldShowModelProviderRefreshLoading({
-        presetLoading: false,
-        customLoading: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("全部分组都不在加载时，刷新按钮不显示 loading", () => {
-    expect(
-      shouldShowModelProviderRefreshLoading({
-        presetLoading: false,
-        customLoading: false,
-      }),
-    ).toBe(false);
-  });
-
   it("使用最小高度自然分栏，由设置页统一滚动", () => {
     const html = renderToStaticMarkup(
       createElement(
@@ -52,8 +24,7 @@ describe("model provider section refresh button loading", () => {
             description: "description",
             refreshLabel: "refresh",
             loadingLabel: "loading",
-            presetLoading: false,
-            customLoading: false,
+            loading: false,
             onRefresh: vi.fn(),
             addProviderLabel: "add provider",
             onAddProvider: vi.fn(),

@@ -60,7 +60,6 @@ const NOT_CONFIGURED_ERROR_CODES: ReadonlySet<string> = new Set([
   ModelErrorCode.ProviderNotConfigured,
   ModelErrorCode.ModelConfigMissing,
   ModelErrorCode.InvalidModelSelection,
-  ModelErrorCode.ModelRequestAuthMissing,
 ]);
 
 export type WorkflowModelFailurePolicy =

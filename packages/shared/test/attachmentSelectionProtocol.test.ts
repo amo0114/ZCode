@@ -11,7 +11,6 @@ describe("附件与文本发送的模型合同", () => {
   const modelExecution = {
     selectionScope: "execution",
     memoryExtraction: "skip",
-    requestAuth: { headers: { "x-test-ticket": "fixture-only" } },
     subagents: { foregroundModel: "submission", background: "deny" },
   };
   it("两种发送保留相同 Selection 与执行约束", () => {

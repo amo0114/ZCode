@@ -17,14 +17,11 @@ describe("Settings breadcrumb replaces detail back navigation", () => {
     expect(readSource(name)).not.toContain("SettingsBackButton");
   });
 
-  it.each(["AutomationEditView", "OffPeakEditView"])(
-    "moves %s back navigation into the breadcrumb",
-    (name) => {
-      const source = readSource(name);
-      expect(source).toContain("SettingsBreadcrumbReporter");
-      expect(source).not.toContain("AUTOMATION_BACK_TRIGGER_CLASSNAME");
-    },
-  );
+  it("moves AutomationEditView back navigation into the breadcrumb", () => {
+    const source = readSource("AutomationEditView");
+    expect(source).toContain("SettingsBreadcrumbReporter");
+    expect(source).not.toContain("AUTOMATION_BACK_TRIGGER_CLASSNAME");
+  });
 
   it.each([
     "CommandsSection",

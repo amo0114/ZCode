@@ -1,8 +1,3 @@
-import {
-  RequestSecurityHost,
-  RequestSecurityWorkspaceBridge,
-  setRequestSecurityReporter,
-} from "@/request-security-edition/index.js";
 /* eslint-disable max-lines -- Root 当前集中编排启动和 workspace shell wiring，先保持入口收口避免跨层状态拆散。 */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LucideProvider, RefreshCw } from "lucide-react";
@@ -27,8 +22,6 @@ import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { SSHDialog } from "@/SSHDialog.js";
 import { SettingsPage } from "@/SettingsPage.js";
-import { CodingPlanUpgradeDialogProvider } from "@/settings/CodingPlanUpgradeDialogProvider.js";
-import { RewardsProvider } from "@/rewards/RewardsProvider.js";
 import { WelcomeScreen, type LoginCompleteReason } from "@/WelcomeScreen.js";
 import { setDefaultFileDisplayBasePath } from "@/lib/fileDisplay.js";
 import { readRendererLaunchTimings, shouldReportLaunchToInput } from "@/lib/launchToInputReport.js";
@@ -59,7 +52,6 @@ import { useRootProviderStateRefresh } from "@/root/useRootProviderStateRefresh.
 import { useModelSelectionServiceView } from "@/hooks/useModelSelectionView.js";
 import { useRootProviderSettingsSnapshot } from "@/root/useRootProviderSettingsSnapshot.js";
 import { useRootOAuthEffects } from "@/root/useRootOAuthEffects.js";
-import { consumeZcodeJwtInvalidRestartMarker } from "@/root/zcodeJwtInvalidRestartMarker.js";
 import { useDesktopNativeThemeSync } from "@/root/useDesktopNativeThemeSync.js";
 import { useRootPlatformEffects } from "@/root/useRootPlatformEffects.js";
 import { useRootWorkspaceActions } from "@/root/useRootWorkspaceActions.js";
@@ -91,14 +83,12 @@ import {
   markCodeCommentRemoved,
 } from "@/lib/codeCommentContext.js";
 import { useCodeCommentPreviewStore } from "@/store/codeCommentPreviewStore.js";
-import { MarketingTouchProvider } from "@/components/marketing-touch/MarketingTouchProvider.js";
 import { setUiPerfArmsReporter } from "@/lib/uiPerfArmsTelemetry.js";
 import { setSessionOpenArmsReporter } from "@/lib/sessionOpenArmsTelemetry.js";
 import { setSendFunnelArmsReporter } from "@/lib/sendFunnelArmsTelemetry.js";
 import { RootStartupLoading } from "@/root/RootStartupLoading.js";
 import { resolveProviderAvailabilityState } from "@/lib/modelProviderAvailability.js";
 import { useProviderAvailabilityLoginEntryGuard } from "@/root/useProviderAvailabilityLoginEntryGuard.js";
-import { ensureProviderFamilyDomainMigration } from "@/lib/providerFamilyDomainMigration.js";
 import { useSettings } from "@/hooks/useSettingService.js";
 import { CLOSE_ACTIVE_CONTEXT_REQUEST_EVENT } from "@/lib/closeActiveContext.js";
 import { AssistantCodeCommentFeatureProvider } from "@/AssistantCodeCommentFeatureProvider.js";
@@ -114,12 +104,7 @@ interface RemoteConnectionOpenPreference {
   preferredWslDistro?: string;
 }
 
-type WelcomeScreenOpenReason =
-  | "startup-provider-required"
-  | "manual-login"
-  | "provider-request"
-  | "logout-provider-required"
-  | "session-expired";
+type WelcomeScreenOpenReason = "startup-provider-required" | "manual-login";
 
 function WebRemoteControlTaskSync({
   syncWebRemoteControlTasks,
@@ -256,14 +241,7 @@ export function Root(props: RootProps) {
                     <AssistantCodeCommentFeatureProvider
                       enabled={props.assistantCodeCommentCardsEnabled}
                     >
-                      <CodingPlanUpgradeDialogProvider>
-                        <RewardsProvider desktop={props.isDesktop === true}>
-                          <RequestSecurityHost />
-                          <MarketingTouchProvider desktop={props.isDesktop === true}>
-                            <RootInner {...props} />
-                          </MarketingTouchProvider>
-                        </RewardsProvider>
-                      </CodingPlanUpgradeDialogProvider>
+                      <RootInner {...props} />
                     </AssistantCodeCommentFeatureProvider>
                   </WebRemoteControlFeatureProvider>
                 </DiffsWorkerPoolProvider>
@@ -300,7 +278,6 @@ function RootInner({
   initialWorkspaceLoadingFallback,
 }: RootProps) {
   useEffect(() => {
-    setRequestSecurityReporter(platform);
     setMcpStorePlatform(platform);
     // 对话 UI perf 只属于 desktop-continuous；Web/mobile 即使能看到权威状态也不装 reporter。
     setUiPerfArmsReporter(isDesktop ? platform : null);
@@ -308,7 +285,6 @@ function RootInner({
     // 发送漏斗同理：只在 Electron 桌面端上报，Web/mobile 的 reportArmsCustomEvent 是空实现。
     setSendFunnelArmsReporter(isDesktop ? platform : null);
     return () => {
-      setRequestSecurityReporter(null);
       setMcpStorePlatform(null);
       setUiPerfArmsReporter(null);
       setSessionOpenArmsReporter(null);
@@ -335,7 +311,7 @@ function RootInner({
   // 动态工作流灰度快照的唯一取数点：
   // 放在 app 级 ServiceProvider 这一层取一次，自动化页与 run 面板只读。消费方可能位于
   // 工作区级 ServiceProvider 内（远程 Host 的 accessor），由它们取数会拿到另一台 Host 的答案。
-  useDynamicWorkflowAvailabilityLoader(services.codingPlanSubscriptionService);
+  useDynamicWorkflowAvailabilityLoader(services.zcodeAgentService);
 
   const { intl, locale } = useZCodeIntl();
   const theme = useZCodeStore((state) => state.theme);
@@ -344,29 +320,16 @@ function RootInner({
   const setUser = useZCodeStore((state) => state.setUser);
   const setIsRestoringOAuthSession = useZCodeStore((state) => state.setIsRestoringOAuthSession);
   const setOAuthError = useZCodeStore((state) => state.setOAuthError);
-  const oauthPollingActive = useZCodeStore((state) => state.oauthPollingActive);
-  const setOAuthPollingActive = useZCodeStore((state) => state.setOAuthPollingActive);
-  const markOAuthSuccess = useZCodeStore((state) => state.markOAuthSuccess);
-  const {
-    settings: appSettings,
-    refresh: refreshAppSettings,
-    update: updateAppSettings,
-  } = useSettings();
+  const { settings: appSettings, refresh: refreshAppSettings } = useSettings();
   // docs/dynamic-workflow/launch.md「The user's choice」：设置里的动态工作流选择变化后，通知本窗口
   // 的 Host 重发 CLI 策略（并转发给远程 Host），再重读灰度快照。
   useDynamicWorkflowUserModeSync({
     settingsLoaded: Boolean(appSettings),
     userMode: appSettings?.dynamicWorkflowMode,
     zcodeAgentService: services.zcodeAgentService,
-    codingPlanSubscriptionService: services.codingPlanSubscriptionService,
   });
   const [welcomeScreenOpenReason, setWelcomeScreenOpenReason] =
-    useState<WelcomeScreenOpenReason | null>(() =>
-      consumeZcodeJwtInvalidRestartMarker() ? "session-expired" : null,
-    );
-  const [providerFamilyDomainMigrationComplete, setProviderFamilyDomainMigrationComplete] =
-    useState(false);
-  const loginEntryRequest = useZCodeStore((state) => state.loginEntryRequest);
+    useState<WelcomeScreenOpenReason | null>(null);
   const rootModelSelectionRead = useModelSelectionServiceView(services.modelSelectionService);
   const rootModelSelectionView =
     rootModelSelectionRead.state.status === "ready" ? rootModelSelectionRead.state.view : null;
@@ -561,36 +524,6 @@ function RootInner({
   );
   const refreshProviderState = useRootProviderStateRefresh(services);
   useRootProviderSettingsSnapshot(services);
-  useEffect(() => {
-    let disposed = false;
-
-    void (async () => {
-      try {
-        await ensureProviderFamilyDomainMigration(services);
-      } catch (error) {
-        logger.warn("[Root] provider family domain 迁移失败，继续启动", {
-          error,
-        });
-      } finally {
-        if (!disposed) {
-          setProviderFamilyDomainMigrationComplete(true);
-          try {
-            await refreshAppSettings();
-            await refreshProviderState();
-          } catch (refreshError) {
-            logger.warn("[Root] provider family domain 迁移后刷新状态失败", {
-              error: refreshError,
-            });
-          }
-        }
-      }
-    })();
-
-    return () => {
-      disposed = true;
-    };
-  }, [refreshAppSettings, refreshProviderState, services]);
-
   const shouldPreferDirectoryBrowser = Boolean(preferDirectoryBrowser);
   const supportsEmbeddedBrowser = explicitSupportsEmbeddedBrowser ?? Boolean(isDesktop);
   const isResolvingStartupAuthState = isRestoringOAuthSession;
@@ -598,7 +531,6 @@ function RootInner({
     modelSelectionView: rootModelSelectionView,
   });
   const providerStartupSyncPending = isProviderStartupSyncPending({
-    providerFamilyDomainMigrationComplete,
     modelSelectionViewHydrated:
       rootProviderAvailability.hydrated || rootModelSelectionRead.state.status === "error",
   });
@@ -612,7 +544,6 @@ function RootInner({
       enabled: providerAvailabilityLoginEntryGuardEnabled,
       user,
       isRestoringOAuthSession: isResolvingStartupAuthState || providerStartupSyncPending,
-      providerFamilyDomain: appSettings?.providerFamilyDomain,
       modelSelectionView: rootModelSelectionView,
       modelSelectionError:
         rootModelSelectionRead.state.status === "error"
@@ -625,9 +556,7 @@ function RootInner({
           if (open) {
             return "startup-provider-required";
           }
-          // JWT 过期提示确认后会先写入 session-expired，随后 provider
-          // 启动门禁以 open=false 收尾。这里若无条件清空，会覆盖重新登录页并回到工作区。
-          // 门禁只能关闭自己拥有的启动登录态，不能清理其它交互来源的 reason。
+          // 门禁只能关闭自己拥有的启动登录态，不能清理其它交互来源（如手动登录）的 reason。
           return currentReason === "startup-provider-required" ? null : currentReason;
         });
       },
@@ -661,9 +590,6 @@ function RootInner({
   const handleOpenDirectoryBrowser = useCallback(() => {
     setDirectoryBrowserOpen(true);
   }, []);
-  const handleReauthenticationRequired = useCallback(() => {
-    setWelcomeScreenOpenReason("session-expired");
-  }, []);
   const {
     setWorkspaceActionError,
     startDraftInWorkspace,
@@ -692,12 +618,8 @@ function RootInner({
     preferDirectoryBrowser: shouldPreferDirectoryBrowser,
     openDirectoryBrowser: handleOpenDirectoryBrowser,
     refreshProviderState,
-    updateAppSettings,
     setOAuthError,
     setUser,
-    onProviderFamilyDomainClearedAfterLogout: () => {
-      setWelcomeScreenOpenReason("logout-provider-required");
-    },
     userId: user?.id,
     onOpenRemoteConnection: allowRemoteWorkspace ? handleOpenRemoteConnection : undefined,
     workbenchGroupClientMode: isWebRemoteControlRoot
@@ -822,14 +744,6 @@ function RootInner({
       />
     ) : null;
 
-  // Bug 原因（2026-08-16 web 远控卡死）：Start Plan 请求校验应答方曾只随桌面正在展示的
-  // session pane 挂载，web 远控新建会话时桌面没有对应 pane、web 端无应答方，
-  // headers 请求永远滞留 pending，任务永久「工作中」。应答方必须常驻桌面窗口、
-  // 覆盖每个打开的 workspace tab，与展示状态解耦；Web 端保持零订阅，桌面仍是唯一权威。
-  const requestSecurityBridgeNode = isDesktop ? (
-    <RequestSecurityWorkspaceBridge workspaceTabs={windowWorkspaceTabs} />
-  ) : null;
-
   const { tryRefresh, clearCredentials } = useTokenRefresh();
   void tryRefresh;
   void clearCredentials;
@@ -923,23 +837,13 @@ function RootInner({
     });
   }, [platform]);
 
-  useRootOAuthEffects({
-    accountIntentKey: JSON.stringify([
-      user?.id,
-      appSettings?.providerFamilyDomain,
-      appSettings?.providerFamilyConnectionSelections,
-    ]),
+  const { hasOAuthProviders } = useRootOAuthEffects({
     platform,
     services,
     refreshProviderState,
-    refreshAppSettings,
     setUser,
     setIsRestoringOAuthSession,
     setOAuthError,
-    oauthPollingActive,
-    setOAuthPollingActive,
-    markOAuthSuccess,
-    onReauthenticationRequired: handleReauthenticationRequired,
   });
 
   useEffect(
@@ -1087,15 +991,6 @@ function RootInner({
     );
   }, [isSettingsTabActive, workspaceShellPath]);
 
-  useEffect(() => {
-    if (!loginEntryRequest) {
-      return;
-    }
-    // 登录入口已从模态弹窗收敛为 WelcomeScreen。
-    // provider 连接请求仍要先退出首次启动引导语义，避免连接完成后误创建默认 workspace。
-    setWelcomeScreenOpenReason("provider-request");
-  }, [loginEntryRequest]);
-
   const handleOpenLoginEntry = () => {
     setWelcomeScreenOpenReason("manual-login");
   };
@@ -1189,7 +1084,7 @@ function RootInner({
     onCreateTask: handleCreateTask,
     onOpenWorkspace: handleOpenWorkspace,
     allowOpenWorkspace,
-    onLogin: !user ? handleOpenLoginEntry : undefined,
+    onLogin: !user && hasOAuthProviders ? handleOpenLoginEntry : undefined,
     onLogout: user ? handleLogout : undefined,
     user,
   };
@@ -1200,7 +1095,6 @@ function RootInner({
       <RootShell>
         {rootModelSelectionErrorNode}
         {webRemoteControlTaskSyncNode}
-        {requestSecurityBridgeNode}
         {remoteConnectionDialog}
         {directoryBrowserDialog}
         {/* 修复原因：HTML 启动壳已经展示 ZCode SVG，但 React 接管 root 后旧壳会被整棵替换。
@@ -1216,7 +1110,6 @@ function RootInner({
       <RootShell>
         {rootModelSelectionErrorNode}
         {webRemoteControlTaskSyncNode}
-        {requestSecurityBridgeNode}
         {remoteConnectionDialog}
         {directoryBrowserDialog}
         <WelcomeScreen onComplete={handleWelcomeScreenComplete} />
@@ -1236,7 +1129,6 @@ function RootInner({
       <RootShell>
         {rootModelSelectionErrorNode}
         {webRemoteControlTaskSyncNode}
-        {requestSecurityBridgeNode}
         {initialWorkspaceLoadingFallback}
         {directoryBrowserDialog}
       </RootShell>
@@ -1247,7 +1139,6 @@ function RootInner({
     <RootShell>
       {rootModelSelectionErrorNode}
       {webRemoteControlTaskSyncNode}
-      {requestSecurityBridgeNode}
       {remoteConnectionDialog}
       {directoryBrowserDialog}
       <OccupationOnboarding
@@ -1295,7 +1186,7 @@ function RootInner({
             allowRemoteWorkspace={allowRemoteWorkspace}
             handleBackFromSettings={handleBackFromSettings}
             handleLogout={user ? handleLogout : undefined}
-            onLogin={!user ? handleOpenLoginEntry : undefined}
+            onLogin={!user && hasOAuthProviders ? handleOpenLoginEntry : undefined}
             user={user}
             reconnectingRemoteWorkspaceKeys={reconnectingRemoteWorkspaceKeys}
             remoteWorkspaceErrorByWorkspaceKey={remoteWorkspaceErrorByWorkspaceKey}

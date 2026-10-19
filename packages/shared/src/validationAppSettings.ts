@@ -11,7 +11,6 @@ import {
   DEFAULT_EMBEDDED_BROWSER_VIEWPORT_PREFERENCE,
   embeddedBrowserViewportPreferenceSchema,
 } from "./browser-use/command-metadata.js";
-import { providerFamilyConnectionSelectionSettingsSchema } from "./provider-family-connection-selection.js";
 
 /** 引导职业枚举；单独导出供 onboarding 记录回填 settings 时做窄化校验。 */
 const appSettingsOccupationSchema = z.enum([
@@ -63,7 +62,6 @@ const enabledBuiltinAgentCliProvidersSchema = z
   // 兼容旧 settings：历史列表可能残留三方 CLI provider，解析后统一归一为 ZCode Agent。
   .array(z.enum(["claude", "opencode", "gemini", "codex", "glm"]))
   .transform(() => [...ZCODE_ENABLED_AGENT_PROVIDERS]);
-const providerFamilyDomainSchema = z.enum(["zai", "bigmodel"]);
 
 export const postUpdateReleaseNotesPayloadSchema = z.object({
   version: nonEmptyStringSchema,
@@ -502,11 +500,6 @@ const appSettingsObjectSchema = z.object({
   enabledBuiltinAgentCliProviders: enabledBuiltinAgentCliProvidersSchema.default([
     ...ZCODE_ENABLED_AGENT_PROVIDERS,
   ]),
-  startPlanRecommendationDismissed: z.boolean().default(false),
-  providerFamilyConnectionSelections: providerFamilyConnectionSelectionSettingsSchema.default({}),
-  providerFamilyDomain: providerFamilyDomainSchema.optional(),
-  providerFamilyDomainUpdatedAt: z.number().int().nonnegative().optional(),
-  providerFamilyDomainMigrated: z.boolean().default(false),
   nativeSearchEnhancementsEnabled: z.boolean().default(true),
   onboardingOccupation: appSettingsOccupationSchema.nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
@@ -578,11 +571,6 @@ export const appSettingsPatchSchema = z.object({
   // 空串是「删除选择、回到跟随」的哨兵：RPC 会吞掉 undefined，normalizeSettingsPatch 把它归一成删除。
   dynamicWorkflowMode: z.union([z.enum(DYNAMIC_WORKFLOW_MODES), z.literal("")]).optional(),
   enabledBuiltinAgentCliProviders: enabledBuiltinAgentCliProvidersSchema.optional(),
-  startPlanRecommendationDismissed: z.boolean().optional(),
-  providerFamilyConnectionSelections: providerFamilyConnectionSelectionSettingsSchema.optional(),
-  providerFamilyDomain: z.union([providerFamilyDomainSchema, z.literal("")]).optional(),
-  providerFamilyDomainUpdatedAt: z.number().int().nonnegative().optional(),
-  providerFamilyDomainMigrated: z.boolean().optional(),
   nativeSearchEnhancementsEnabled: z.boolean().optional(),
   onboardingOccupation: z
     .enum([

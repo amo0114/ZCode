@@ -129,12 +129,9 @@ export const ServiceChannels = {
   /** 本地 usage 统计服务 */
   UsageStats: "usage-stats",
   /** Coding Plan 订阅购买服务 */
-  CodingPlanSubscription: "coding-plan-subscription",
   ClientConfig: "client-config",
   /** ZCode 客户端场景配置服务 */
   ClientScenes: "client-scenes",
-  CloudContent: "cloud-content",
-  MarketingTouch: "marketing-touch",
   /** Skills 管理服务 */
   Skills: "skills",
   /** SSH 远程 skills 同步服务 */
@@ -170,9 +167,6 @@ export const ServiceChannels = {
   /** Composer 附件在 host-local 与 remote runtime 之间的预传服务 */
   PromptAttachmentTransfer: "prompt-attachment-transfer",
   /** 闲时任务管理服务（与 automation 服务面独立） */
-  OffPeakTask: "off-peak-task",
-  /** Highspeed 加速卡抽取与分享服务 */
-  HighspeedCard: "highspeed-card",
   /** Onboarding 完成记录服务（本地持久化，后续上传服务器） */
   OnboardingRecord: "onboarding-record",
 } as const;
@@ -511,19 +505,6 @@ export interface EmbeddedBrowserWheelBoundaryPayload {
   deltaY: number;
 }
 
-// ============================================================================
-// Coding Plan WebView 频道 —— 官网页 preload ↔ App renderer
-// ============================================================================
-
-/**
- * Electron `<webview>`（partition=persist:zcode-coding-plan）的 `sendToHost` / `ipc-message` 频道。
- * 官网页通过 preload 注入的 window.zcodeBridge 调用，不经过 main process。
- */
-export const CodingPlanWebviewChannels = {
-  /** 官网页购买成功后通知 App 刷新 entitlements 并关闭 webview。 */
-  PurchaseComplete: "zcode:coding-plan-purchase-complete",
-} as const;
-
 /**
  * 插件 UI 沙箱 guest（partition=plugin-sandbox:<id>）的 main → guest preload 频道。
  * preload 只把 MessagePort 组经 window.postMessage 转交给受信 shell，不暴露任何 contextBridge API。
@@ -532,28 +513,6 @@ export const PluginSandboxChannels = {
   /** main → guest：{ sandboxId, initId, names } + port1[]，shell 据此建立宿主端口 */
   Init: "zcode:plugin-sandbox-init",
 } as const;
-
-/** 购买完成回传 payload。provider 与官网 CodingPlanProvider / auth-ready 事件 detail.provider 同构。 */
-export interface CodingPlanPurchaseCompletePayload {
-  provider: "zai" | "bigmodel";
-  /** 客户端时间戳，用于 App 侧去重/日志，不参与判等。 */
-  timestamp: number;
-}
-
-/**
- * 官网页 window.__zcodeLang__ 的取值，与 App IntlProvider 的 Locale 一致。
- * App locale 变化时通过 executeJavaScript 重写此变量并派发 lang-change 事件。
- */
-export type CodingPlanWebviewLocale = "zh-CN" | "en-US";
-
-/**
- * 官网页 lang-change 事件 detail。App 用 executeJavaScript 在 main world 派发
- * `zcode-coding-plan-lang-change` CustomEvent，website 侧（zcodeBridge.onLangChange 或
- * 直接 window.addEventListener）订阅后切换 copy。
- */
-export interface CodingPlanWebviewLangChangeDetail {
-  locale: CodingPlanWebviewLocale;
-}
 
 // ============================================================================
 // 内部传输频道 —— 框架级别的通信
@@ -628,8 +587,6 @@ export const HostMessageTypes = {
   FeedbackLogArchiveResult: "feedback-log-archive-result",
   /** main → host：定时任务到点派发；会话内 cron 复用 targetTaskId，历史未绑定任务才建 session */
   CronRun: "cron-run",
-  /** main → host：闲时任务派发；首跑 createTask 新建 session，续跑带 conversationId/sessionId resume */
-  OffPeakRun: "off-peak-run",
   /** main → host：browser-use 命令执行结果（CDP 执行完回传，按 requestId 关联） */
   BrowserExecuteResult: "browser-execute-result",
   /** main → host：本地视频 canonical path 授权结果 */
@@ -725,12 +682,8 @@ export const HostResponseTypes = {
   FeedbackLogArchiveRequest: "feedback-log-archive-request",
   /** host → main：定时任务派发结果（成功回填 taskId/sessionId，失败带 transient/permanent） */
   CronRunResult: "cron-run-result",
-  /** host → main：闲时任务派发结果（成功回填 conversationId/sessionId，失败带 transient/permanent） */
-  OffPeakRunResult: "off-peak-run-result",
   /** host → main：manual run 已落库，请立即唤醒 scheduler 认领派发 */
   CronSchedulerWakeRequest: "cron-scheduler-wake-request",
-  /** host → main：闲时任务翻 schedulable，请立即唤醒 scheduler 认领派发（与 cron 消息独立） */
-  OffPeakSchedulerWakeRequest: "off-peak-scheduler-wake-request",
   /** host → main：执行一条 browser-use 命令（main 用 WebContentsView+CDP 执行，按 requestId 关联） */
   BrowserExecuteRequest: "browser-execute-request",
   /** host → main：请求授权 Agent 已精确校验的本地视频路径 */

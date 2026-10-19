@@ -61,20 +61,8 @@ export function useWorkflowSettingsModelChoices(scope: WorkflowSettingsModelScop
   );
   const view = modelRead.state.status === "ready" ? modelRead.state.view : null;
   const groups: ModelSelectGroup[] = useMemo(
-    () =>
-      view === null
-        ? []
-        : buildRegistryModelSelectGroups(ZCODE_AGENT_PROVIDER, view, {
-            apiKeyLabel: format("settings.modelProvider.apiKey"),
-            apiKeyBadgeLabel: format("settings.modelProvider.connectionMode.apiKeyBadge"),
-            codingPlanLabel: format("settings.modelProvider.connectionMode.codingPlan"),
-            codingPlanBadgeLabel: format("settings.modelProvider.connectionMode.codingPlanBadge"),
-            startPlanLabel: format("settings.modelProvider.connectionMode.startPlan"),
-            startPlanBadgeLabel: format("settings.modelProvider.connectionMode.startPlanBadge"),
-            teamPlanBadgeLabel: format("settings.modelProvider.connectionMode.teamPlanBadge"),
-            teamPlanFallbackLabel: format("settings.modelProvider.connectionMode.teamPlan"),
-          }),
-    [format, view],
+    () => (view === null ? [] : buildRegistryModelSelectGroups(ZCODE_AGENT_PROVIDER, view)),
+    [view],
   );
   const providerName = useCallback(
     (providerId: string) =>
@@ -87,11 +75,7 @@ export function useWorkflowSettingsModelChoices(scope: WorkflowSettingsModelScop
   const sessionModelName =
     sessionModel === undefined
       ? format("chat.toolCall.workflow.run.settings.model.sessionFallback")
-      : formatProviderModelLabel(
-          sessionModel.providerId,
-          providerName(sessionModel.providerId),
-          sessionModel.modelId,
-        );
+      : formatProviderModelLabel(providerName(sessionModel.providerId), sessionModel.modelId);
   const sessionBadge = format("chat.toolCall.workflow.run.settings.model.session");
   // 两个字段都是字符串，所以这一项只在文案真变了时换引用；下游的模型选择器是 memo 组件。
   const sessionModelItem: ModelSelectGroupItem = useMemo(

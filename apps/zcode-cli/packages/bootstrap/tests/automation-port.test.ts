@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AutomationCreateLimitError, isAutomationCreateLimitError } from "@zcode/contracts";
-import { AUTOMATION_CREATE_LIMIT_ERROR_CODE, isHighspeedProviderId, zcodeProtocolMethods } from "@zcode/shared";
+import { AUTOMATION_CREATE_LIMIT_ERROR_CODE, zcodeProtocolMethods } from "@zcode/shared";
 import {
   AUTOMATION_CREATE_BOUND_SESSION_CHECK_ERROR,
   AUTOMATION_CREATE_FROM_AUTOMATION_RUN_ERROR,
@@ -746,12 +746,12 @@ describe("createProtocolAutomationPort", () => {
     });
   });
 
-  it("Highspeed Turn 中 CronCreate 持久化加速前的会话模型", async () => {
+  it("CronCreate 持久化当前会话的模型选择", async () => {
     const requestClient = vi.fn(async (method: string) => {
       if (method === zcodeProtocolMethods.automationCheckTaskBinding) return { bound: false };
       return {
         automation: {
-          automationId: "automation-highspeed",
+          automationId: "automation-session-model",
           title: "daily report",
           cronExpr: "0 9 * * *",
           prompt: "write daily report",
@@ -764,8 +764,7 @@ describe("createProtocolAutomationPort", () => {
         },
       };
     });
-    // 加速轮的模型只存在于本轮 modelExecution（selectionScope=execution），从不写回
-    // Session Selection；所以 CronCreate 读到的 Session Selection 必须仍是加速前的普通选型。
+    // CronCreate 只读 Session Selection；本轮执行材料不回写会话选型。
     const getSessionModelSelection = vi.fn(() => ({
       providerId: "account:zai-individual-coding-plan",
       modelId: "GLM-5",
@@ -804,11 +803,7 @@ describe("createProtocolAutomationPort", () => {
       }),
       expect.anything(),
     );
-    // 定时任务禁止落库加速卡 Provider，否则后续触发会拿不到卡凭据而失败。
-    const createdPayload = requestClient.mock.calls.find(
-      (call) => call[0] === zcodeProtocolMethods.automationCreate,
-    )?.[1] as { modelSelection?: { providerId?: string } } | undefined;
-    expect(isHighspeedProviderId(createdPayload?.modelSelection?.providerId)).toBe(false);
+
   });
 
   it("CronCreate 成功后冻结当前会话标题，避免迟到 generated title 覆盖 automation 语义", async () => {

@@ -1,14 +1,12 @@
 import type { Logger, ModelStatusSink, ModelTextResult } from "@zcode/contracts";
 import {
   ModelErrorCode,
-  ModelProtocolError,
   ModelRetryReason,
   ModelTransportKind as ModelTransportKindValue,
 } from "@zcode/contracts";
 import { classifyModelFailure, inspectProviderFailure } from "./failure-classifier.js";
 import type { ClassifiedModelFailure } from "./failure-classifier.js";
 import { getResponseHeaders, unwrapRetryError } from "./failure-inspection.js";
-import { offPeakTicketExpiredMessage, resolveOffPeakFailureDecision } from "./offpeak-retry.js";
 import { AiSdkModelAdapterError } from "./errors.js";
 import { resolveAnthropicRequestMetadataUserId } from "./anthropic-request-metadata.js";
 import { createGenerateTextOptions } from "./runner-options.js";
@@ -51,8 +49,6 @@ import type {
   AiSdkModelTextRequest,
   ResolvedAiSdkModel,
 } from "./runner-runtime.js";
-import { AccountRequestRetry } from "./account-request-retry.js";
-import { resolveModelForAttempt, RuntimeHeadersRefreshError } from "./runner-runtime-headers.js";
 import { retryAllowedByFailurePolicy } from "./workflow-model-failure-policy.js";
 import { modelFailureStatusFields, providerRequestIdFromHeaders } from "./runner-telemetry.js";
 import { repairReasoningHistoryAfterSignatureRejection } from "./reasoning-history-normalization.js";
@@ -91,7 +87,6 @@ export async function runGenerateText(input: {
   const isDev = isDevelopmentModelIOEnv(input.env);
   let requestMessages = input.request.messages;
   let signatureRepairAttempted = false;
-  const authRetry = new AccountRequestRetry(input.request, input.resolved, input.logger);
   let emptyCompletionRetryCount = 0;
 
   for (
@@ -99,18 +94,18 @@ export async function runGenerateText(input: {
     retryAttemptLoopContinues(
       retryBudget,
       attempt,
-      input.retry.maxAttempts + Number(signatureRepairAttempted) + authRetry.extraAttempts,
+      input.retry.maxAttempts + Number(signatureRepairAttempted),
     );
     attempt += 1
   ) {
-    const retryBudgetAttempt = attempt - Number(signatureRepairAttempted) - authRetry.extraAttempts;
+    const retryBudgetAttempt = attempt - Number(signatureRepairAttempted);
     const attemptRequest = { ...input.request, messages: requestMessages };
     const startedAt = Date.now();
     let resolved = input.resolved;
     let statusContext = createAttemptStatusContext(
       {
         ...baseStatusContext,
-        maxAttempts: statusMaxAttempts(Number(signatureRepairAttempted) + authRetry.extraAttempts),
+        maxAttempts: statusMaxAttempts(Number(signatureRepairAttempted)),
       },
       attempt,
     );
@@ -157,12 +152,7 @@ export async function runGenerateText(input: {
     }
 
     try {
-      resolved = await resolveModelForAttempt({
-        attempt,
-        reason: authRetry.takeReason(),
-        request: authRetry.prepareRequest(attemptRequest),
-        resolveModel: input.resolveModel,
-      });
+      resolved = input.resolveModel();
       const anthropicMetadataUserId = await resolveAnthropicRequestMetadataUserId({
         env: input.env,
         providerKind: resolved.providerKind,
@@ -329,35 +319,11 @@ export async function runGenerateText(input: {
         providerMetadata: result.providerMetadata as Record<string, unknown> | undefined,
       };
     } catch (error) {
-      // 合并后鉴权解析进入 attempt try；与 stream 一致保留网络前凭据缺失的类型化错误。
-      if (
-        error instanceof ModelProtocolError &&
-        error.code === ModelErrorCode.ModelRequestAuthMissing
-      )
-        throw error;
       const completedAt = Date.now();
-      const classified = classifyModelFailure(error, input.request.abortSignal);
-      if (error instanceof RuntimeHeadersRefreshError) {
-        classified.message = error.message;
-        classified.retryable = false;
-      }
-      // off-peak 特判（仅 idle plan provider，见 offpeak-retry.ts）：排队 429 豁免预算、
-      // 3102（兼容旧 3001）以稳定标记落败触发 desktop 侧续跑。
-      const offPeak = resolveOffPeakFailureDecision({
-        offPeak: resolved.accountAccess?.mode === "off-peak",
-        failure: classified,
-        error: unwrapRetryError(error),
-      });
-      const failure: ClassifiedModelFailure =
-        offPeak?.kind === "ticketExpired"
-          ? {
-              ...classified,
-              retryable: false,
-              message: offPeakTicketExpiredMessage(classified.message),
-            }
-          : offPeak?.kind === "queued"
-            ? { ...classified, retryable: true, retryReason: ModelRetryReason.OffpeakQueued }
-            : classified;
+      const failure: ClassifiedModelFailure = classifyModelFailure(
+        error,
+        input.request.abortSignal,
+      );
       const responseHeaders = sanitizeModelNetworkHeaders(
         getResponseHeaders(unwrapRetryError(error)),
       );
@@ -374,28 +340,18 @@ export async function runGenerateText(input: {
         requestMessages = repairedMessages;
         statusContext = {
           ...statusContext,
-          maxAttempts: statusMaxAttempts(1 + authRetry.extraAttempts),
+          maxAttempts: statusMaxAttempts(1),
         };
       }
       const canRetryWithFailurePolicy =
-        offPeak?.kind === "queued"
-          ? true
-          : retryBudgetAllows(retryBudget, retryBudgetAttempt, input.retry.maxAttempts) &&
+        retryBudgetAllows(retryBudget, retryBudgetAttempt, input.retry.maxAttempts) &&
             // workflow 流量（无上限预算）读策略表而不是分类器的 retryable；有界预算逐字不变。
             retryAllowedByFailurePolicy(
               failure,
               retryBudget,
               inspectProviderFailure(error).providerErrorCode,
             );
-      const retryWithAuth = authRetry.claim(error, options === undefined);
-      if (retryWithAuth)
-        statusContext = {
-          ...statusContext,
-          maxAttempts: statusMaxAttempts(
-            Number(signatureRepairAttempted) + authRetry.extraAttempts,
-          ),
-        };
-      const canRetry = retryWithAuth || retryWithRepairedHistory || canRetryWithFailurePolicy;
+      const canRetry = retryWithRepairedHistory || canRetryWithFailurePolicy;
 
       if (options) {
         recordGenerateTextDebug({
@@ -450,19 +406,6 @@ export async function runGenerateText(input: {
         });
       }
 
-      if (retryWithAuth) {
-        await publishRetryScheduledStatus(
-          input,
-          statusContext,
-          attempt,
-          0,
-          { ...failure, retryReason: ModelRetryReason.AuthRefresh },
-          requestHeaders,
-          responseHeaders,
-        );
-        continue;
-      }
-
       if (retryWithRepairedHistory) {
         input.logger?.warn("Retrying model request after thinking signature rejection", {
           attempt,
@@ -488,10 +431,11 @@ export async function runGenerateText(input: {
         continue;
       }
 
-      const delayMs =
-        offPeak?.kind === "queued"
-          ? offPeak.delayMs
-          : calculateRetryDelay(input.retry, retryBudgetAttempt, failure.retryAfterMs);
+      const delayMs = calculateRetryDelay(
+        input.retry,
+        retryBudgetAttempt,
+        failure.retryAfterMs,
+      );
       logRetryDelayDecision({
         attempt,
         canRetry,
@@ -547,10 +491,6 @@ export async function runGenerateText(input: {
         throw toAdapterError(sleepError, sleepFailure, statusContext, attempt, {
           errorPhase: "connect",
         });
-      }
-      if (offPeak?.kind === "queued") {
-        // 排队等待不消耗重试预算：回退计数让 for 自增后原地重试，无限探测。
-        attempt -= 1;
       }
     } finally {
       admission.release();

@@ -6,10 +6,7 @@ import {
   getConversationTelemetryParityScenario,
   type ConversationTelemetryParityOperation,
 } from "@/lib/conversationTelemetryParityScenarioDefinitions.js";
-import {
-  runRequestVerificationParityAssertions,
-  runQuotaParityStateAssertions,
-} from "@/lib/conversationTelemetryParityStateE2E.js";
+import { runRequestVerificationParityAssertions } from "@/request-security-edition/parity.js";
 import { shouldExposeE2EStoreBridge } from "@/lib/e2eStoreBridge.js";
 import { resetMessageTelemetryForTest } from "@/lib/messageTelemetry.js";
 import { setUiPerfArmsReporter } from "@/lib/uiPerfArmsTelemetry.js";
@@ -130,10 +127,6 @@ async function applyCurrentOperation(input: {
     rememberStateAssertion(input.stateAssertions, "web:no-final-output");
     return;
   }
-  if (operation.kind === "quota.assert") {
-    input.stateAssertions.push(...runQuotaParityStateAssertions());
-    return;
-  }
   if (operation.kind === "verification.assert") {
     input.stateAssertions.push(...runRequestVerificationParityAssertions());
     return;
@@ -159,8 +152,6 @@ async function applyCurrentOperation(input: {
           model_provider: operation.modelProvider ?? "",
           ...(operation.providerHostname ? { provider_name: operation.providerHostname } : {}),
           agent: "glm",
-          plan_status: "unknown",
-          plan_product_id: "",
         },
       });
       return;

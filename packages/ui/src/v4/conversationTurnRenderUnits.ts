@@ -25,14 +25,12 @@ import {
   resolveConversationTurnWorkDurationMs,
   resolveConversationTurnWorkStatus,
 } from "@/v4/conversationTurnWorkSegments.js";
-import { markHighspeedOutputFooterUnits } from "@/highspeed/highspeedOutputFooter.js";
 
 export type { AssistantWorkRow, ConversationTurnFlowItem } from "@/v4/conversationTurnFlowItems.js";
 export type {
   ConversationTurnWorkSegment,
   ConversationTurnWorkStatus,
 } from "@/v4/conversationTurnWorkSegments.js";
-export { resolveNextHighspeedExpiryMs } from "@/highspeed/highspeedConversationRows.js";
 
 interface DraftTurnRenderUnit {
   key: string;
@@ -439,5 +437,7 @@ export function buildConversationTurnRenderUnits(
   const normalizedUnits = keptUnits.map((unit, index) =>
     normalizeRenderUnitPosition(unit, index, keptUnits.length, options),
   );
-  return markHighspeedOutputFooterUnits(normalizedUnits, options.nowMs ?? Date.now());
+  // 加速卡 footer 标记已随加速卡模块移除：footers 只由 userInput 上的加速元数据驱动，
+  // 该协议字段已删除，标记函数在无该元数据时恒为恒等映射，故直接返回归一化结果。
+  return normalizedUnits;
 }

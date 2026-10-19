@@ -7,7 +7,7 @@ import type {
 import type { Event, IDisposable } from "@zcode/rpc";
 import { ServiceChannels } from "@zcode/shared";
 import type { AppUsageRange, AppUsageSnapshot, ZCodeTaskTokenUsageResult } from "@zcode/shared";
-import type { DynamicWorkflowMode } from "@zcode/shared";
+import type { DynamicWorkflowClientConfig, DynamicWorkflowMode } from "@zcode/shared";
 import type { ZCodeAutomation, ZCodeAutomationRun } from "@zcode/shared";
 import type {
   ZCodeStorageStartupState,
@@ -60,8 +60,6 @@ import type {
   ZCodePluginsSetEnabledResult,
   ZCodePluginsCancelOperationResult,
   ZCodePluginOperationProgressNotification,
-  ZCodeProviderRuntimeHeadersRequestParams,
-  ZCodeProviderRuntimeHeadersCancelled,
   ZCodeProviderTestModelConnectivityParams,
   ZCodeProviderTestModelConnectivityResult,
   ZCodeUserInputRequestParams,
@@ -358,16 +356,6 @@ export interface ZCodeAgentTestModelConnectivityParams extends ZCodeAgentWorkspa
   signal?: AbortSignal;
 }
 
-// 合并时曾混用 Agent 完整鉴权响应；UI 只能回传请求校验，账号鉴权必须由 Host 合成。
-export type ProviderRuntimeHeadersUiResponse =
-  | { headersApplied: true; runtimeProviderHeaders: Record<string, string>; errorMessage?: string }
-  | { headersApplied: false; errorMessage?: string };
-
-export interface ZCodeAgentRespondProviderRuntimeHeadersParams extends ZCodeAgentSessionTarget {
-  requestId: string;
-  response: ProviderRuntimeHeadersUiResponse;
-}
-
 export interface ZCodeAgentSessionRuntimePreferencesRequest extends ZCodeSessionRequestRuntimePreferencesParams {
   requestId: string;
 }
@@ -589,7 +577,6 @@ export type ZCodeAgentServiceEvent =
       requestId: string;
       response: ZCodeUserInputResponse;
     }
-  | { type: "providerRuntimeHeaders.request"; request: ZCodeProviderRuntimeHeadersRequestParams }
   | { type: "snapshot"; snapshot: ZCodeSessionStateSnapshot };
 
 export interface ZCodeAgentAppRuntimePreferences {
@@ -630,6 +617,8 @@ export interface IZCodeAgentService {
    * desktop-attached remote Host 以传入值为准（缺席 = 跟随服务端）。不得为此启动空闲 Agent。
    */
   syncDynamicWorkflowUserMode(params: { mode?: DynamicWorkflowMode }): Promise<void>;
+  /** Host 当前生效的动态工作流快照（提供 + 用户选择）；renderer 只读这一份，不自行裁决。 */
+  getDynamicWorkflowClientConfig(): Promise<DynamicWorkflowClientConfig>;
   getWorkspaceRuntimeIdentity(
     params: ZCodeAgentWorkspaceTarget,
   ): Promise<ZCodeAgentWorkspaceRuntimeIdentity>;
@@ -821,34 +810,9 @@ export interface IZCodeAgentService {
   setModel(params: ZCodeAgentSetModelParams): Promise<ZCodeSessionStateSnapshot>;
   setThoughtLevel(params: ZCodeAgentSetThoughtLevelParams): Promise<ZCodeSessionStateSnapshot>;
   setMode(params: ZCodeAgentSetModeParams): Promise<ZCodeSessionStateSnapshot>;
-  respondProviderRuntimeHeaders(
-    params: ZCodeAgentRespondProviderRuntimeHeadersParams,
-  ): Promise<void>;
   respondSessionRuntimePreferences(
     params: ZCodeAgentRespondSessionRuntimePreferencesParams,
   ): Promise<void>;
-  /**
-   * v4 UI 的 Start Plan runtime-auth bridge 只需要本地 pending request 事件，
-   * 不能为此额外打开旧 `session/subscribe`，否则会把旧 replay/continuous 读路径
-   * 重新带回 v4 pane。
-   */
-  onDynamicProviderRuntimeHeadersRequest(
-    params: ZCodeAgentSessionTarget,
-  ): Event<ZCodeProviderRuntimeHeadersRequestParams>;
-  /**
-   * Start Plan runtime headers 的 workspace 级订阅入口（生产应答方使用）。
-   * Bug 原因（2026-08-16 web 远控卡死）：session 级入口只随桌面 pane 挂载订阅，
-   * web 远控新建会话在桌面没有 pane、web 端无应答方，请求校验请求滞留 pending，
-   * 任务永久「工作中」。桌面窗口用本入口为每个打开的 workspace tab 维持常驻应答方；
-   * 订阅时先注册 live listener 再按 workspaceKey 前缀补投 pending，与 session 级同语义。
-   */
-  onDynamicWorkspaceProviderRuntimeHeadersRequest(
-    params: ZCodeAgentWorkspaceTarget,
-  ): Event<ZCodeProviderRuntimeHeadersRequestParams>;
-  /** 只投递本 workspace 的校验取消，不属于 conversation stream。 */
-  onDynamicWorkspaceProviderRuntimeHeadersCancelled(
-    params: ZCodeAgentWorkspaceTarget,
-  ): Event<ZCodeProviderRuntimeHeadersCancelled>;
   onDynamicSessionRuntimePreferencesRequest(): Event<ZCodeAgentSessionRuntimePreferencesRequest>;
   /**
    * CLI 进程级资源样本，带 services 打的 lane 标签（CLI 自己不知道 lane）。

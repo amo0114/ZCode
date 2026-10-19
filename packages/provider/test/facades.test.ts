@@ -8,14 +8,10 @@ import {
   ProviderConfigMap,
   ProviderRegistryService,
   ProviderSettingsFacade,
-  type AccountProviderConfigSnapshot,
   type ProviderConfigSnapshot,
   type ProviderSource,
 } from "../src/index.js";
-import {
-  createAccountProviderConfig,
-  createApiKeyProviderConfig,
-} from "./provider-config-fixtures.js";
+import { createApiKeyProviderConfig } from "./provider-config-fixtures.js";
 
 class StaticSource<TSnapshot> implements ProviderSource<TSnapshot> {
   constructor(readonly snapshot: TSnapshot) {}
@@ -65,11 +61,12 @@ async function createService(): Promise<ProviderRegistryService> {
     personalRevision: "personal-1",
     zcodeBuiltinProviders: new ProviderConfigMap([
       [
-        "account",
-        createAccountProviderConfig({
+        "builtin",
+        createApiKeyProviderConfig({
           apiFormat: "anthropic-messages",
-          baseURL: "https://account.example.com",
-          models: ["m1", "m2"],
+          baseURL: "https://builtin.example.com",
+          apiKey: "builtin-key",
+          models: ["m1"],
         }),
       ],
       ["broken", createApiKeyProviderConfig({ models: ["m1"] })],
@@ -120,18 +117,7 @@ async function createService(): Promise<ProviderRegistryService> {
       },
     ]),
   };
-  const account: AccountProviderConfigSnapshot = {
-    revision: "account-1",
-    states: { account: { availability: "available", entitled: true, current: true } },
-    basedOnZCodeBuiltinRevision: "builtin-1",
-    providers: new ProviderConfigMap([
-      ["account", createAccountProviderConfig({ models: ["m1"], entitled: true })],
-    ]),
-  };
-  const service = new ProviderRegistryService({
-    configSource: new StaticSource(config),
-    accountSource: new StaticSource(account),
-  });
+  const service = new ProviderRegistryService({ configSource: new StaticSource(config) });
   await service.start();
   return service;
 }
@@ -142,26 +128,26 @@ describe("Provider Facades", () => {
     const view = new ProviderSettingsFacade(service).getView();
 
     expect(view.providers.map((provider) => provider.providerId)).toEqual([
-      "account",
+      "builtin",
       "broken",
       "personal",
     ]);
     expect(view.providers[0]).toMatchObject({
-      providerId: "account",
+      providerId: "builtin",
       executable: true,
       effectiveBuiltinConfig: {
-        access: { type: "zhipu-account" },
+        access: { type: "api-key", apiKey: "builtin-key" },
         api: {
           type: "anthropic-messages",
-          baseUrl: "https://account.example.com",
+          baseUrl: "https://builtin.example.com",
         },
         builtinModelIds: ["m1"],
       },
       effectiveConfig: {
-        access: { type: "zhipu-account" },
+        access: { type: "api-key", apiKey: "builtin-key" },
         api: {
           type: "anthropic-messages",
-          baseUrl: "https://account.example.com",
+          baseUrl: "https://builtin.example.com",
         },
         builtinModelIds: ["m1"],
       },
@@ -309,9 +295,9 @@ describe("Provider Facades", () => {
     const facade = new ModelSelectionFacade(service);
     const view = facade.getView();
 
-    expect(view.providers.map((provider) => provider.providerId)).toEqual(["account", "personal"]);
+    expect(view.providers.map((provider) => provider.providerId)).toEqual(["builtin", "personal"]);
     expect(service.listProviders().map((provider) => provider.providerId)).toEqual([
-      "account",
+      "builtin",
       "hidden",
       "personal",
     ]);
@@ -321,25 +307,23 @@ describe("Provider Facades", () => {
     expect(view.providers[1]?.config).not.toHaveProperty("label");
   });
 
-  it("消费者有效选择不进入共享 View，旧账号身份即使不在 Registry 也能对应", async () => {
+  it("消费者有效选择不进入共享 View", async () => {
     const service = await createService();
-    const facade = new ModelSelectionFacade(service, (id) =>
-      ["old-account", "account"].includes(id) ? "account-plan" : "ordinary",
-    );
+    const facade = new ModelSelectionFacade(service);
     const original = {
-      providerId: "old-account",
+      providerId: "builtin",
       modelId: "m1",
       options: { reasoningLevel: "disabled" },
     };
     const view = facade.getView(undefined, undefined, { selection: original });
-    expect(view.effectiveSelection).toEqual({ ...original, providerId: "account" });
+    expect(view.effectiveSelection).toEqual(original);
     expect(view.selectionIssue).toBeUndefined();
     expect(facade.getView()).not.toHaveProperty("effectiveSelection");
     expect(facade.getView(undefined, undefined, { selection: null }).effectiveSelection).toBeNull();
     expect(
       facade.getView(undefined, undefined, { selection: original }).effectiveSelection,
     ).toEqual(view.effectiveSelection);
-    expect(original.providerId).toBe("old-account");
+    expect(original.providerId).toBe("builtin");
   });
 
   it("Settings 写操作只接收可序列化配置，并在 Registry 刷新后返回同一份 View", async () => {

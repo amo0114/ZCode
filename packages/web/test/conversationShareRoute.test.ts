@@ -40,17 +40,6 @@ describe("conversation share route", () => {
     expect(source).not.toContain("artifact{artifactCount === 1");
   });
 
-  it("英文分享 OAuth callback 与中文 callback 走同一回调页面", () => {
-    const mainSource = readFileSync("packages/web/src/main.tsx", "utf8");
-    const authSource = readFileSync("packages/web/src/auth/webAuthService.ts", "utf8");
-    const stateSource = readFileSync("packages/web/src/auth/oauthStateCodec.ts", "utf8");
-    expect(mainSource).toContain('"/share/callback"');
-    expect(authSource).toContain('"/share/callback"');
-    expect(stateSource).toContain('"/share/callback"');
-    expect(stateSource).toContain("const SHARE_PATH_PATTERN");
-    expect(stateSource).toContain("cn\\/share|share");
-  });
-
   it("分享页同步 html lang 与浏览器标签标题", () => {
     // index.html 固定 lang="en"；不同步会让中文分享页对无障碍与浏览器翻译都报错语言。
     // 而 document.title 此前从未设置，标签只显示 index.html 的通用标题。

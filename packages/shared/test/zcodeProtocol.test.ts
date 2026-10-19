@@ -4,8 +4,6 @@ import {
   ZCODE_PROTOCOL_NAME,
   ZCODE_PROTOCOL_VERSION,
   zcodeComputerUseOperationEventSchema,
-  zcodeProviderRuntimeHeadersRequestParamsSchema,
-  zcodeProviderRuntimeHeadersResponseSchema,
   zcodeProtocolMethods,
   zcodeProtocolMessageSchema,
   zcodeProcessResourceSampleSchema,
@@ -393,32 +391,6 @@ describe("ZCode Protocol", () => {
         sessionId: "sess_1",
         content: "continue",
         browserAmbientContext: { tabCount: 1, pageText: "secret" },
-      }),
-    ).toThrow();
-  });
-
-  it("session/send accepts Off-Peak turn attribution but rejects competing automation identity", () => {
-    expect(
-      zcodeSessionSendParamsSchema.parse({
-        sessionId: "sess_1",
-        content: "continue",
-        offPeakTaskId: "offpeak-1",
-        offPeakRunType: "resume",
-      }),
-    ).toMatchObject({ offPeakTaskId: "offpeak-1", offPeakRunType: "resume" });
-    expect(() =>
-      zcodeSessionSendParamsSchema.parse({
-        sessionId: "sess_1",
-        content: "invalid",
-        offPeakRunType: "init",
-      }),
-    ).toThrow();
-    expect(() =>
-      zcodeSessionSendParamsSchema.parse({
-        sessionId: "sess_1",
-        content: "continue",
-        automationId: "automation-1",
-        offPeakTaskId: "offpeak-1",
       }),
     ).toThrow();
   });
@@ -965,98 +937,6 @@ describe("ZCode Protocol", () => {
       zcodeSessionResumeParamsSchema.parse({
         sessionId: "sess_1",
         unexpectedToolPolicy: true,
-      }),
-    ).toThrow();
-  });
-
-  it("models provider runtime header refresh as a strict interaction request", () => {
-    const params = zcodeProviderRuntimeHeadersRequestParamsSchema.parse({
-      requestId: "header-refresh-1",
-      sessionId: "sess_1",
-      turnId: "turn_1",
-      workspace,
-      modelSelection: model,
-      providerId: "account:zai-individual-coding-plan",
-      reason: "model-request",
-    });
-    // 当前请求期鉴权材料承接请求级 header；不能恢复旧 Registry revision 或裸 headers 协议。
-    const runtimeProviderHeaders = {
-      "X-Request-Scoped-Param": "request-token",
-      "X-Request-Scoped-Region": "cn",
-    };
-    const response = zcodeProviderRuntimeHeadersResponseSchema.parse({
-      headersApplied: true,
-      requestAuth: {
-        apiKey: "request-key",
-        headers: { "X-Request": "request-header", ...runtimeProviderHeaders },
-      },
-    });
-    expect(response).toMatchObject({ requestAuth: { headers: runtimeProviderHeaders } });
-    expect(() =>
-      zcodeProviderRuntimeHeadersResponseSchema.parse({
-        headersApplied: true,
-      }),
-    ).toThrow();
-    expect(() =>
-      zcodeProviderRuntimeHeadersResponseSchema.parse({
-        headersApplied: true,
-        runtimeProviderHeaders,
-        providerRevision: "rev-2",
-      }),
-    ).toThrow();
-
-    expect(zcodeProtocolMethods.interactionRequestProviderRuntimeHeaders).toBe(
-      "interaction/requestProviderRuntimeHeaders",
-    );
-    expect(() =>
-      zcodeProviderRuntimeHeadersRequestParamsSchema.parse({
-        ...params,
-        staleHeader: "must-not-pass-through",
-      }),
-    ).toThrow();
-  });
-
-  it.each(["start-plan", "individual-coding-plan", "team-coding-plan", "off-peak"] as const)(
-    "runtime headers 直接接受 Registry zhipu access mode: %s",
-    (mode) => {
-      const parsed = zcodeProviderRuntimeHeadersRequestParamsSchema.parse({
-        requestId: `request-${mode}`,
-        sessionId: "sess_1",
-        workspace,
-        modelSelection: model,
-        providerId: `account:${mode}`,
-        accountAccess: {
-          type: "zhipu-account",
-          accountType: "bigmodel",
-          mode,
-          entitled: true,
-        },
-        reason: "model-request",
-      });
-
-      expect(parsed.accountAccess).toEqual({
-        type: "zhipu-account",
-        accountType: "bigmodel",
-        mode,
-        entitled: true,
-      });
-    },
-  );
-
-  it("runtime headers 拒绝已经退出 Registry 的旧 planKind Access 形状", () => {
-    expect(() =>
-      zcodeProviderRuntimeHeadersRequestParamsSchema.parse({
-        requestId: "request-legacy",
-        sessionId: "sess_1",
-        workspace,
-        modelSelection: model,
-        providerId: "account:legacy",
-        accountAccess: {
-          type: "zhipu-account",
-          accountType: "bigmodel",
-          planKind: "team-coding-plan",
-        },
-        reason: "model-request",
       }),
     ).toThrow();
   });

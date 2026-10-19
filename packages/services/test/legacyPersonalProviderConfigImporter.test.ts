@@ -348,7 +348,6 @@ describe("Legacy Personal Provider Config Importer", () => {
       personalProviders: document.providers,
       zcodeBuiltinModelRules: genericRules,
       personalModels: document.models,
-      accountProviders: ProviderConfigMap.empty(),
     });
 
     const model = resolution.resolvedProviders[0]?.models[0];
@@ -402,7 +401,6 @@ describe("Legacy Personal Provider Config Importer", () => {
       personalProviders: document.providers,
       zcodeBuiltinModelRules: zcodeBuiltinSnapshot().models,
       personalModels: document.models,
-      accountProviders: ProviderConfigMap.empty(),
     });
     expect(
       resolution.resolvedProviders

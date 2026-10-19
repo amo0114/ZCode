@@ -47,50 +47,6 @@ describe("tool result display", () => {
     expect(parseToolResultDisplayPayload(display)).toEqual(display);
   });
 
-  it("carries the official MCP unavailable code from the tool error payload", () => {
-    const display = createToolResultDisplay(
-      "mcp__zcode-official__search_image",
-      {
-        content: [
-          {
-            type: "text",
-            text: '{"error_code":"quota_exceeded","message":"daily quota exceeded for bucket search_image (5/5)","request_id":"req-1"}',
-          },
-        ],
-        isError: true,
-      },
-      {
-        mcp: {
-          serverName: "zcode-official",
-          toolName: "search_image",
-          official: true,
-        },
-      },
-    );
-
-    expect(display).toEqual({
-      kind: "mcp_tool",
-      serverName: "zcode-official",
-      toolName: "search_image",
-      unavailable: { code: "quota_exceeded" },
-    });
-    // strict schema 必须接受该字段，否则整条 row 会被拒。
-    expect(parseToolResultDisplayPayload(display)).toEqual(display);
-  });
-
-  it("carries the coding-plan-required code as well", () => {
-    const display = createToolResultDisplay(
-      "mcp__zcode-official__speech_synthesize",
-      {
-        content: [{ type: "text", text: '{"error_code":"coding_plan_required","message":"..."}' }],
-        isError: true,
-      },
-      { mcp: { serverName: "zcode-official", toolName: "speech_synthesize", official: true } },
-    );
-
-    expect(display).toMatchObject({ unavailable: { code: "coding_plan_required" } });
-  });
-
   it("ignores the unavailable payload from a non-official MCP server", () => {
     // 不判来源的话，任何第三方 MCP 都能伪造一条 Coding Plan 提示误导用户去购买。
     const display = createToolResultDisplay(

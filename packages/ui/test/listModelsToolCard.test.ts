@@ -3,7 +3,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { resolveToolCallRenderer } from "@/ToolCallBlocks/resolveRenderer.js";
 import {
@@ -15,9 +14,9 @@ import type { ToolCallBlockRenderContext } from "@/ToolCallBlocks/shared.js";
 
 // 团队套餐的 providerId 是一个 UUID。它是本卡最重要的负面断言：一个字符都不该上屏。
 const TEAM_PROVIDER_UUID = "4fc7f541-2382-4c32-be11-f021b8d7ed1d";
-const BUILTIN_BIGMODEL_PROVIDER_ID = BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan;
+const BIGMODEL_PROVIDER_ID = "9a1d2c3b-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 
-const CURRENT_MODEL_ID = `${BUILTIN_BIGMODEL_PROVIDER_ID}/GLM-5.3-Flash`;
+const CURRENT_MODEL_ID = `${BIGMODEL_PROVIDER_ID}/GLM-5.3-Flash`;
 
 const LIST_MODELS_DISPLAY = {
   kind: "list_models",
@@ -25,16 +24,18 @@ const LIST_MODELS_DISPLAY = {
   models: [
     {
       id: CURRENT_MODEL_ID,
-      providerId: BUILTIN_BIGMODEL_PROVIDER_ID,
+      providerId: BIGMODEL_PROVIDER_ID,
       modelId: "GLM-5.3-Flash",
+      providerLabel: "BigModel",
       reasoningLevels: ["low", "medium", "high"],
       defaultReasoningLevel: "high",
       contextWindow: 128_000,
     },
     {
-      id: `${BUILTIN_BIGMODEL_PROVIDER_ID}/GLM-5.3`,
-      providerId: BUILTIN_BIGMODEL_PROVIDER_ID,
+      id: `${BIGMODEL_PROVIDER_ID}/GLM-5.3`,
+      providerId: BIGMODEL_PROVIDER_ID,
       modelId: "GLM-5.3",
+      providerLabel: "BigModel",
       reasoningLevels: ["low", "medium", "high", "max"],
       defaultReasoningLevel: "max",
       contextWindow: 200_000,
@@ -184,14 +185,14 @@ describe("ListModelsToolCallBlock", () => {
 
     expect(screen.getByText("Available models")).toBeTruthy();
     expect(screen.getByText("4 models")).toBeTruthy();
-    // 内置家族 → 家族名；自定义 provider → 载荷里的 providerLabel。
+    // provider 分组名取载荷里的 providerLabel。
     expect(screen.getByText("BigModel")).toBeTruthy();
     expect(screen.getByText("MyProxy")).toBeTruthy();
     expect(screen.getByText("GLM-5.3-Flash")).toBeTruthy();
     expect(screen.getByText("glm-4.7")).toBeTruthy();
-    // 本卡最重要的负面断言：UUID 与内置 providerId 一个字符都不上屏。
+    // 本卡最重要的负面断言：providerId 一个字符都不上屏。
     expect(document.body.textContent).not.toContain(TEAM_PROVIDER_UUID);
-    expect(document.body.textContent).not.toContain(BUILTIN_BIGMODEL_PROVIDER_ID);
+    expect(document.body.textContent).not.toContain(BIGMODEL_PROVIDER_ID);
     // 通用兜底会打印整包 toolCall；专用卡必须没有这些结构键。
     expect(document.body.textContent).not.toContain('"toolId"');
     expect(document.body.textContent).not.toContain("models count");

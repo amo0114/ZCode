@@ -33,7 +33,7 @@ describe("Zhipu four manual API templates", () => {
             type: standard ? "openai-chat-completions" : "anthropic-messages",
             baseUrl: `https://${host}/api/${standard ? "paas/v4" : "anthropic"}`,
           });
-          expect(config.access.type).toBe(standard ? "api-key" : "zhipu-coding-plan-api-key");
+          expect(config.access.type).toBe("api-key");
           expect(config.access.apiKeyManagementUrl).toBe(
             family === "zai"
               ? "https://z.ai/manage-apikey/apikey-list"

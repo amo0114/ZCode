@@ -206,11 +206,11 @@ describe("v4 原生 createSession", () => {
     const { host, createSessionRecord } = makeCreateHost(record);
 
     await new V4CommandExecutor(host).execute(
-      envelope("createSession", { workspaceId: "/w", offPeakToolEnabled: true }, "draft-offpeak"),
+      envelope("createSession", { workspaceId: "/w" }, "draft-create"),
     );
 
     expect(createSessionRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: "/w", offPeakToolEnabled: true }),
+      expect.objectContaining({ workspaceId: "/w" }),
     );
   });
 

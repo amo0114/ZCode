@@ -4,11 +4,6 @@ export function createTelemetryReportFixture() {
   const reports: Array<Record<string, unknown>> = [];
   return async (req: IncomingMessage, res: ServerResponse) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
-    if (path === "/__e2e/marketing/telemetry") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(reports));
-      return true;
-    }
     if (path !== "/api/v1/event/report") return false;
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));

@@ -331,20 +331,8 @@ export interface BackgroundResultOriginMeta {
  */
 export type TurnExecutionKind = "agent" | "controlOnly";
 
-export type OffPeakRunType = "init" | "resume";
-
-export type TurnBackgroundAttribution =
-  | { automationId: string; offPeakTaskId?: never; offPeakRunType?: never }
-  | {
-      offPeakTaskId: string;
-      offPeakRunType?: OffPeakRunType;
-      automationId?: never;
-    }
-  | {
-      automationId?: undefined;
-      offPeakTaskId?: undefined;
-      offPeakRunType?: never;
-    };
+/** 单个自动输入轮的来源归因（闲时身份已随 Off-Peak 移除，只剩定时任务）。 */
+export type TurnBackgroundAttribution = { automationId?: string | undefined };
 
 /**
  * 中枢直接启动已保存工作流的启动轮元数据。同一份同时写进 user message 的 `metadata`（冷恢复来源）与 `TurnStarted`

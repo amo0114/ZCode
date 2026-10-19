@@ -23,7 +23,6 @@ import {
 } from "../../tool/read-file-state.js";
 import type { ProjectMemoryRetrievalBranch } from "../../memory/project-memory-retrieval-branch.js";
 import type { AgentRuntimeInternal } from "../internal.js";
-import { createRefreshRuntimeHeadersBeforeModelAttempt } from "../methods/model-runtime-headers.js";
 import { withModelInvocationContext } from "../methods/runtime-model.js";
 import {
   systemReminderAttachmentEntry,
@@ -217,7 +216,7 @@ async function prefetchProjectMemories(
 
       const selection = await runMemorySelector({
         abortSignal: input.abortSignal,
-        model: selectorModel(input.model, runtime, input.traceContext),
+        model: selectorModel(input.model, input.traceContext),
         query: input.query,
         state: input.state,
       });
@@ -255,19 +254,10 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function selectorModel(
-  model: Model,
-  runtime: AgentRuntimeInternal,
-  traceContext: TraceContext,
-): Model {
-  return withModelInvocationContext(model, (request) => ({
+function selectorModel(model: Model, traceContext: TraceContext): Model {
+  return withModelInvocationContext(model, () => ({
     metadata: { querySource: "project_memory_recall" },
     modelCall: { operation: "project_memory_recall" },
-    refreshRuntimeHeadersBeforeAttempt: createRefreshRuntimeHeadersBeforeModelAttempt(runtime, {
-      abortSignal: request.abortSignal,
-      model,
-      traceContext,
-    }),
     traceContext,
   }));
 }

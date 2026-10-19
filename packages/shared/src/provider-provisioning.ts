@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { modelSelectionSchema } from "./model-selection.js";
-import { providerFamilyConnectionSelectionSettingsSchema } from "./provider-family-connection-selection.js";
 
 const nonEmptyString = z.string().trim().min(1);
 
@@ -8,26 +7,8 @@ export const providerProvisioningTriggerSchema = z.enum([
   "environment-online",
   "personal-config",
   "configured-default",
-  "account-settings",
-  "credential",
 ]);
 export type ProviderProvisioningTrigger = z.infer<typeof providerProvisioningTriggerSchema>;
-
-/** Provisioning 中允许跨 Environment 传输的凭据类别。 */
-export const providerProvisioningCredentialScopeSchema = z.enum([
-  "oauth-session",
-  "account-provider",
-]);
-
-export type ProviderProvisioningCredentialScope = z.infer<
-  typeof providerProvisioningCredentialScopeSchema
->;
-
-/** 仅供校验 schema v1 旧信封；新 Source 不导出、新 Target 不应用这些历史 Key。 */
-export function isProviderProvisioningAccountCredentialKey(key: string): boolean {
-  const normalized = key.trim();
-  return normalized === key && /^account-provider:.+:api-key$/.test(normalized);
-}
 
 /** Personal Config 的 Envelope；具体字段由 @zcode/provider 在目标 Environment 再校验。 */
 export const providerProvisioningPersonalConfigSchema = z
@@ -48,45 +29,14 @@ export type ProviderProvisioningPersonalConfig = z.infer<
   typeof providerProvisioningPersonalConfigSchema
 >;
 
-export const providerProvisioningAccountSettingsSchema = z
-  .object({
-    providerFamilyDomain: z.enum(["zai", "bigmodel"]).nullable(),
-    providerFamilyConnectionSelections: providerFamilyConnectionSelectionSettingsSchema,
-  })
-  .strict();
-
-export type ProviderProvisioningAccountSettings = z.infer<
-  typeof providerProvisioningAccountSettingsSchema
->;
-
-export const providerProvisioningCredentialEntrySchema = z
-  .object({
-    scope: providerProvisioningCredentialScopeSchema,
-    key: nonEmptyString,
-    value: z.string(),
-  })
-  .strict();
-
-export type ProviderProvisioningCredentialEntry = z.infer<
-  typeof providerProvisioningCredentialEntrySchema
->;
-
 export const providerProvisioningEnvelopeSchema = z
   .object({
-    // v2 的缺失账号 Key 不再代表删除；旧 Target 必须在任何写入前拒绝该信封。
-    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    // v3 移除了账号设置与 OAuth 凭据；旧 Target 会在任何写入前拒绝未知版本。
+    schemaVersion: z.literal(3),
     syncId: nonEmptyString,
     personalConfig: providerProvisioningPersonalConfigSchema,
-    accountSettings: providerProvisioningAccountSettingsSchema,
-    credentials: z.array(providerProvisioningCredentialEntrySchema).max(256),
   })
-  .strict()
-  .refine(
-    (value) =>
-      value.schemaVersion === 1 ||
-      value.credentials.every((entry) => entry.scope === "oauth-session"),
-    { message: "Provisioning v2 only accepts OAuth credentials", path: ["credentials"] },
-  );
+  .strict();
 
 export type ProviderProvisioningEnvelope = z.infer<typeof providerProvisioningEnvelopeSchema>;
 
@@ -109,7 +59,6 @@ export const providerProvisioningResultSchema = z
     syncId: nonEmptyString,
     status: z.enum(["applied", "already-applied", "unsupported", "failed", "rollback_failed"]),
     personalProviderCount: z.number().int().nonnegative(),
-    credentialCount: z.number().int().nonnegative(),
     configRevision: nonEmptyString.optional(),
     errorMessage: z.string().optional(),
     errorCode: providerProvisioningErrorCodeSchema.optional(),

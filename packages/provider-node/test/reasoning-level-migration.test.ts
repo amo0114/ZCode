@@ -7,7 +7,7 @@ import {
   ProviderConfigMap,
   ProviderConfigResolver,
   ProviderConfig,
-  ZhipuAccountAccessConfig,
+  ApiKeyAccessConfig,
   createRegistryModelConfig,
   createRegistryProviderConfig,
   type ModelSelection,
@@ -29,47 +29,38 @@ beforeAll(async () => {
 });
 afterAll(() => source.dispose());
 
+const PROVIDER_ID = "personal-bigmodel";
+
 function view(modelId: string, level: string, personalModels = ModelConfigRules.empty()) {
   const config = {
     revision: "c",
     zcodeBuiltinRevision: "b",
     personalRevision: "p",
     zcodeBuiltinProviders: builtin.providers,
-    zcodeBuiltinProviderTemplates: builtin.templates,
-    personalProviders: ProviderConfigMap.empty(),
+    zcodeBuiltinProviderTemplates: builtin.providerTemplates,
+    personalProviders: new ProviderConfigMap([
+      {
+        providerId: PROVIDER_ID,
+        templateId: "bigmodel-api",
+        config: new ProviderConfig({
+          group: "standard-personal",
+          access: new ApiKeyAccessConfig({ apiKey: "fixture" }),
+        }),
+      },
+    ]),
     zcodeBuiltinModelRules: builtin.models,
     personalModels,
   };
-  const account = {
-    revision: "a",
-    basedOnZCodeBuiltinRevision: "b",
-    providers: new ProviderConfigMap([
-      [
-        "account:bigmodel-individual-coding-plan",
-        new ProviderConfig({ access: new ZhipuAccountAccessConfig({ entitled: true }) }),
-      ],
-    ]),
-    states: {
-      "account:bigmodel-individual-coding-plan": {
-        availability: "available" as const,
-        entitled: true,
-        current: true,
-      },
-    },
-  };
   // 真实 Built-in 规则和 Resolver；补入模型成员用于独立覆盖 GLM 的不同代际。
-  const resolution = new ProviderConfigResolver().resolve({
-    ...config,
-    accountProviders: account.providers,
-    accountStates: account.states,
-  });
-  const providerId = "account:bigmodel-individual-coding-plan";
+  const resolution = new ProviderConfigResolver().resolve(config);
+  const providerId = PROVIDER_ID;
   const providerConfig = resolution.effectiveProviders.get(providerId)!;
   const modelConfig = ModelConfigRules.composeEffective(builtin.models, personalModels).resolve({
     providerId,
+    templateId: "bigmodel-api",
     modelId,
     apiType: providerConfig.api?.type,
-    baseURL: providerConfig.api?.baseUrl,
+    baseUrl: providerConfig.api?.baseUrl,
   });
   const checkedModel = createRegistryModelConfig(modelConfig);
   const checkedProvider = createRegistryProviderConfig(providerConfig);
@@ -89,10 +80,9 @@ function view(modelId: string, level: string, personalModels = ModelConfigRules.
   };
   const snapshot: ProviderRegistryServiceSnapshot = {
     config,
-    account,
     resolution,
     registry,
-    sourceRevisions: { config: "c", account: "a" },
+    sourceRevisions: { config: "c" },
   };
   const facade = createNodeModelSelectionFacade({
     getSnapshot: () => snapshot,
@@ -163,7 +153,7 @@ describe("Todo95C 来源限定的只读关闭档位改名", () => {
       new ModelConfigRules([
         {
           type: "provider-model",
-          providerId: "account:bigmodel-individual-coding-plan",
+          providerId: PROVIDER_ID,
           modelId: "GLM-5.2",
           config: new ModelConfig({
             optionSpecs: new ModelOptionSpecsConfig({ reasoningLevel: { values } }),

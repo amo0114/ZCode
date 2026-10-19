@@ -26,7 +26,7 @@ describe("Todo116 单一 Key 链接原生打开", () => {
     await clearAppData();
   });
 
-  it("K116-N01：两类手动 Access 从唯一入口打开配置 URL，不修改配置", async function () {
+  it("K116-N01：两个模板 Provider 从唯一入口打开配置 URL，不修改配置", async function () {
     this.timeout(120_000);
     const received = new Set<string>();
     const nonce = randomUUID();
@@ -39,7 +39,7 @@ describe("Todo116 单一 Key 链接原生打开", () => {
       },
       {
         id: "e2e-key-native-plan",
-        type: "zhipu-coding-plan-api-key",
+        type: "api-key",
         apiKey: "",
         templateId: "zai-api",
       },

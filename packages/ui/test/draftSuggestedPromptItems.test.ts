@@ -130,7 +130,8 @@ describe("draft suggested prompt Client Scenes mapping", () => {
         id: "open-automations",
         label: navigationPrompt.labels,
         prompt: navigationPrompt.contents,
-        actions: ["NAVIGATE:AUTOMATIONS", "NAVIGATE:AUTOMATIONS:OFFPEAK"],
+        // 闲时入口动作已下线，白名单只剩 NAVIGATE:AUTOMATIONS；OFFPEAK 变体按未知动作丢弃。
+        actions: ["NAVIGATE:AUTOMATIONS"],
       },
     ]);
   });

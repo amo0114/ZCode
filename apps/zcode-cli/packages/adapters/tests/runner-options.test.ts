@@ -1,46 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModelErrorCode } from "@zcode/contracts";
 import { AiSdkModelAdapterError } from "../src/model/errors.js";
-import {
-  createGenerateTextOptions,
-  createStreamTextOptions,
-  shouldIncludeStreamResponseBody,
-} from "../src/model/runner-options.js";
+import { createGenerateTextOptions, createStreamTextOptions } from "../src/model/runner-options.js";
 import { isOpenCodeGoBaseUrl } from "../src/model/opencode-session.js";
 import type { ResolvedAiSdkModel } from "../src/model/runner-runtime.js";
 
 function resolved(partial: Partial<ResolvedAiSdkModel>): ResolvedAiSdkModel {
   return partial as ResolvedAiSdkModel;
 }
-
-describe("shouldIncludeStreamResponseBody", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.resetModules();
-  });
-
-  it("enables responseBody capture for zcode-plan openai-compatible providers", () => {
-    expect(
-      shouldIncludeStreamResponseBody(
-        resolved({
-          providerKind: "openai-compatible",
-          baseURL: "https://zcode.z.ai/api/v1/zcode-plan",
-        }),
-      ),
-    ).toBe(true);
-  });
-
-  it("skips responseBody capture for unrelated providers", () => {
-    expect(
-      shouldIncludeStreamResponseBody(
-        resolved({
-          providerKind: "openai-compatible",
-          baseURL: "https://api.openai.com/v1",
-        }),
-      ),
-    ).toBe(false);
-  });
-});
 
 describe("isOpenCodeGoBaseUrl", () => {
   it.each(["https://opencode.ai/zen/go/v1", "https://api.opencode.ai/zen/go/v1/"])(

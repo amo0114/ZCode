@@ -16,18 +16,17 @@ import { createTestModelProperties } from "./test-model-format.js";
 
 describe("Goal Verifier bound model options", () => {
   it.each([
-    ["high", 64_000, false],
-    ["max", 128_000, false],
-    ["disabled", 4_000, false],
-    [undefined, 64_000, false],
-    ["high", 64_000, true],
-  ] as const)("inherits %s and the %i output limit (retry=%s)", async (level, limit, retry) => {
+    ["high", 64_000],
+    ["max", 128_000],
+    ["disabled", 4_000],
+    [undefined, 64_000],
+  ] as const)("inherits %s and the %i output limit", async (level, limit) => {
     const root = await mkdtemp(join(tmpdir(), "zcode-verifier-options-"));
     const sessionId = createSessionId("verifier-options");
     const store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
     const requests: Required<ModelOptions>[] = [];
     const selection = {
-      providerId: retry ? "account:bigmodel-start-plan" : "fixture",
+      providerId: "fixture",
       modelId: "model",
       ...(level ? { options: { reasoningLevel: level } } : {}),
     };
@@ -60,18 +59,6 @@ describe("Goal Verifier bound model options", () => {
                 async generateText(request) {
                   // 捕获真实 Model 合并、校验之后的参数，而非仅观察 Factory 输入。
                   requests.push(request.options);
-                  if (retry && requests.length === 2) {
-                    runtime!.setSessionModelSelection({ providerId: "other", modelId: "other" });
-                    throw Object.assign(new Error("model admission concurrency limit exceeded"), {
-                      code: "model_rate_limited",
-                      context: {
-                        providerCode: "3010",
-                        providerId: current.providerId,
-                        reason: "rate_limited",
-                        retryable: false,
-                      },
-                    });
-                  }
                   return {
                     finishReason: "stop",
                     text:
@@ -92,13 +79,11 @@ describe("Goal Verifier bound model options", () => {
       await store.setTarget({ sessionID: sessionId, objective: "Complete fixture work" });
       await runtime.executeTurn("complete work");
       await runtime.continueActiveTargetIfIdle({ verifyBeforeContinue: true });
-      expect(requests).toHaveLength(retry ? 3 : 2);
+      expect(requests).toHaveLength(2);
       for (const request of requests.slice(1)) {
         expect(request).toEqual({ maxOutputTokens: limit, reasoningLevel: level ?? "max" });
       }
-      expect(runtime.getSessionModelSelection()).toEqual(
-        retry ? { providerId: "other", modelId: "other" } : selection,
-      );
+      expect(runtime.getSessionModelSelection()).toEqual(selection);
       expect((await store.readTarget({ sessionID: sessionId }))?.status).toBe("complete");
     } finally {
       runtime?.beginShutdown();

@@ -74,8 +74,6 @@ export interface V4SessionRecordView {
   residencyFinalizationCount?: number;
   /** 当前正在执行的 automation 派发 turn；只在 turn 运行期间存在。 */
   activeAutomationId?: string;
-  /** 当前正在执行的闲时派发 turn；只在 turn 运行期间存在。 */
-  activeOffPeakTaskId?: string;
   /** 当前 Bot 入站 turn 的稳定回推地址；turn 结束后必须恢复。 */
   activeBotDeliveryTarget?: ZCodeAutomationBotDeliveryTarget;
   /** 恢复失败告警：存在时拒绝新 turn（历史损坏不能静默续写）。 */
@@ -96,7 +94,7 @@ export interface V4CommandCoreHost {
   /** guide eligibility：只阻止已有 ordinary queue；已有 guide 仍允许继续按 FIFO admission。 */
   hasQueuedDelivery?(sessionId: string, delivery: "guide" | "queue"): boolean;
   getQueueLength?(sessionId: string): number;
-  /** Highspeed queue 的执行材料含凭据，只允许驻留内存，禁止进入 queue event/snapshot。 */
+  /** queue 的执行材料含凭据，只允许驻留内存，禁止进入 queue event/snapshot。 */
   retainQueuedTurnExecution?(
     sessionId: string,
     sourceCommandId: string,
@@ -206,24 +204,6 @@ export interface V4CommandCoreHost {
       feedback: "like" | "dislike" | null;
     },
   ): Promise<void>;
-  /** Highspeed 完成态统计先更新 user transcript metadata，再发布同一 entity 的投影事件。 */
-  setHighspeedMetrics?(
-    sessionId: string,
-    input: {
-      entityId: string;
-      messageId: string;
-      metrics: {
-        regularTps: number;
-        outputTokens: number;
-        durationMs: number;
-        highspeedTps: number;
-        savedDurationMs: number;
-        modelDurationMs?: number;
-        toolDurationMs?: number;
-        otherDurationMs?: number;
-      };
-    },
-  ): Promise<void>;
   /**
    * 交互应答登记表（v4 原生基础设施，非过渡钩子）：interaction-broker 发起
    * 反向请求（permission/AskUserQuestion）时注册 deferred，resolveInteraction 命令
@@ -269,8 +249,6 @@ export interface V4CommandCoreHost {
     workspaceId: string;
     permissionScope?: "session";
     mcpServers?: CommandPayloadMap["createSession"]["mcpServers"];
-    /** host 判定的 Off-Peak 工具面门禁；缺省不注册工具。 */
-    offPeakToolEnabled?: boolean;
     /**
      * host 判定的动态工作流灰度门；
      * 缺省回落到进程级 workspace 结论，仍是 fail-closed。

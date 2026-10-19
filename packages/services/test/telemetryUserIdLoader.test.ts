@@ -31,3 +31,18 @@ describe("createTelemetryUserIdLoader", () => {
     expect(deletedKeys).toEqual([]);
   });
 });
+
+describe("createTelemetryUserIdLoader（无注册登录渠道）", () => {
+  it("旧版本留下的 OAuth 凭据不会被读成 userId", async () => {
+    const values: Record<string, string> = {
+      "oauth:active_provider": "zai",
+      "oauth:zai:user_info": '{"id":"u1","username":"u","displayName":"u"}',
+    };
+    const credentialService: ICredentialService = {
+      load: async (key) => values[key] ?? null,
+      save: async () => {},
+      delete: async () => {},
+    };
+    await expect(createTelemetryUserIdLoader(credentialService)()).resolves.toBe("");
+  });
+});

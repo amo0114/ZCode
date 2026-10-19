@@ -37,7 +37,6 @@ import { readZCodeStdioTapDevState } from "./zcodeStdioTapDevConfig.js";
 import type { ZCodeAgentPresentationSurface } from "./zcodeAgentPresentationSurface.js";
 import { shouldSpawnInDetachedProcessGroup } from "../process/processTreeTerminator.js";
 import type { RuntimeProcessLifecycleReporter } from "../process/runtimeProcessLifecycle.js";
-import { buildAgentWorkspaceIdentityEnv } from "../runtime-tools/agentProxyEnv.js";
 
 export interface ZCodeAgentCommand {
   /** 本地配套 CLI bundle 的存储专用 Worker 入口；远端/自定义命令不推断能力。 */
@@ -1037,8 +1036,6 @@ export class ZCodeAgentProcessManager {
         ...effectiveCommand.env,
         // 生成文件根目录由执行端 Host 唯一决定，保证 Agent 写入与 Host 读取授权一致。
         [GEN_UI_OUTPUT_ROOT_ENV]: join(getAppConfigDir(), GEN_UI_OUTPUT_DIRECTORY),
-        // 身份/隔离语义使用 workspaceIdentity；cwd 继续使用 workspacePath。
-        ...buildAgentWorkspaceIdentityEnv(params.workspaceIdentity),
         ...buildE2EAgentCoverageEnv(),
       },
       stdio: ["pipe", "pipe", "pipe"],

@@ -114,8 +114,8 @@ describe("redactTelemetryUrl", () => {
 
 describe("resolveTelemetryProviderScope", () => {
   it("内置 provider 保留稳定 ID", () => {
-    expect(resolveTelemetryProviderScope("account:zai-individual-coding-plan")).toEqual({
-      providerId: "account:zai-individual-coding-plan",
+    expect(resolveTelemetryProviderScope("builtin:zai")).toEqual({
+      providerId: "builtin:zai",
       providerScope: "builtin",
     });
   });
@@ -212,7 +212,7 @@ describe("sanitizeTelemetryModelValue", () => {
   });
 
   it("provider/model 复合值按 provider 判定", () => {
-    expect(sanitizeTelemetryModelValue("account:zai-start-plan/glm-4.6")).toBe("glm-4.6");
+    expect(sanitizeTelemetryModelValue("builtin:zai/glm-4.6")).toBe("glm-4.6");
     expect(sanitizeTelemetryModelValue("my-proxy/secret-model")).toBe("custom");
   });
 

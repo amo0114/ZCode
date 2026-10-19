@@ -9,19 +9,11 @@ import {
   reportAutomationActionClick,
   reportAutomationCreateResult,
 } from "@/lib/automationTelemetry.js";
-import { freezeOffPeakCreateTelemetrySnapshot } from "@/lib/offPeakTelemetry.js";
 import { buildCompactionTelemetryExtraDetail } from "@/lib/messageTelemetry.js";
 
-// 790884b1ce：Team 使用 canonical Coding Plan 身份；两家闲时共用同一 ID。
 const identities = [
   ["zai-api", "builtin:zai"],
   ["bigmodel-api", "builtin:bigmodel"],
-  ...["zai", "bigmodel"].flatMap((family) => [
-    [`account:${family}-individual-coding-plan`, `builtin:${family}-coding-plan`],
-    [`account:${family}-team-coding-plan`, `builtin:${family}-coding-plan`],
-    [`account:${family}-start-plan`, `builtin:${family}-start-plan`],
-    [`account:${family}-offpeak-idle-plan`, "offpeak-idle-plan"],
-  ]),
   ["personal-uuid", "personal-uuid"],
   ["builtin:zai-coding-plan", "builtin:zai-coding-plan"],
   ["account:future-plan", "account:future-plan"],
@@ -33,7 +25,7 @@ describe("Provider 埋点旧口径", () => {
     async (family) => {
       const platform = { reportTelemetryEvent: vi.fn(async () => {}) };
       const modelSelection = {
-        providerId: `account:${family}-team-coding-plan`,
+        providerId: `${family}-api`,
         modelId: "vendor/model:1%",
       };
       const modelFields = resolveAutomationSelectionTelemetry(modelSelection, null);
@@ -56,7 +48,7 @@ describe("Provider 埋点旧口径", () => {
       expect(platform.reportTelemetryEvent).toHaveBeenCalledTimes(3);
       for (const [payload] of platform.reportTelemetryEvent.mock.calls) {
         expect(payload.eventExtraDetail).toMatchObject({
-          model_provider: `builtin:${family}-coding-plan`,
+          model_provider: `builtin:${family}`,
           model_name: modelSelection.modelId,
           provider_name: "",
         });
@@ -82,23 +74,15 @@ describe("Provider 埋点旧口径", () => {
     });
     expect(selection).toEqual({ providerId, modelId });
   });
-  it.each(["zai", "bigmodel"])("%s 闲时冻结旧桶，纯模型值不变", (family) => {
-    expect(
-      freezeOffPeakCreateTelemetrySnapshot({
-        providerId: `account:${family}-offpeak-idle-plan`,
-        model: "GLM-5.3-Flash",
-      }),
-    ).toMatchObject({ modelProvider: "offpeak-idle-plan", modelName: "GLM-5.3-Flash" });
-  });
   it("压缩保留原模型形式，不增 hostname", () => {
     const detail = buildCompactionTelemetryExtraDetail({
       timeline: { status: "completed", trigger: "manual" },
-      modelName: "account:bigmodel-team-coding-plan/GLM-5.3",
-      modelProvider: "account:bigmodel-team-coding-plan",
+      modelName: "bigmodel-api/GLM-5.3",
+      modelProvider: "bigmodel-api",
     });
     expect(detail).toMatchObject({
-      model_name: "builtin:bigmodel-coding-plan/GLM-5.3",
-      model_provider: "builtin:bigmodel-coding-plan",
+      model_name: "builtin:bigmodel/GLM-5.3",
+      model_provider: "builtin:bigmodel",
     });
     expect(detail).not.toHaveProperty("provider_name");
   });

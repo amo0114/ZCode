@@ -2,34 +2,6 @@ import { describe, expect, it } from "vitest";
 import { appSettingsPatchSchema, appSettingsSchema } from "../src/validationAppSettings.js";
 
 describe("app settings", () => {
-  it("round-trips every structured Provider Family connection selection", () => {
-    const selections = {
-      zai: { kind: "individual-coding-plan" },
-      bigmodel: {
-        kind: "team-coding-plan",
-        productId: "product-1",
-        organizationId: "org-1",
-        projectId: "project-1",
-      },
-    } as const;
-
-    expect(
-      appSettingsSchema.parse({ providerFamilyConnectionSelections: selections })
-        .providerFamilyConnectionSelections,
-    ).toEqual(selections);
-    expect(
-      appSettingsPatchSchema.parse({ providerFamilyConnectionSelections: selections })
-        .providerFamilyConnectionSelections,
-    ).toEqual(selections);
-    expect(
-      appSettingsPatchSchema.safeParse({
-        providerFamilyConnectionSelections: {
-          zai: { kind: "team-coding-plan", productId: "p", organizationId: "o" },
-        },
-      }).success,
-    ).toBe(false);
-  });
-
   it("defaults and validates the human embedded Browser viewport preference", () => {
     expect(appSettingsSchema.parse({}).embeddedBrowserViewportPreference).toEqual({
       mode: "normal",

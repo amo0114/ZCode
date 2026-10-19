@@ -50,63 +50,6 @@ vi.mock("@/App.js", () => ({
 }));
 
 // Root 用例只验证挂载与远控开关；营销业务由专属测试覆盖，避免拉入整棵媒体/供应商依赖树。
-vi.mock("@/components/marketing-touch/MarketingTouchProvider.js", () => ({
-  MarketingTouchProvider: ({ children }: { children: unknown }) => children,
-  MarketingBanner: () => null,
-}));
-
-vi.mock("@/ConfirmDialog.js", () => ({
-  ConfirmDialogHost: () => createElement("div", { "data-testid": "confirm-dialog-host" }),
-}));
-
-vi.mock("@/hooks/usePlatform.js", () => ({
-  PlatformProvider: ({ children }: { children: unknown }) => children,
-  useOptionalPlatform: () => ({
-    getWebRemoteControlStatus: vi.fn(async () => ({ status: "idle" })),
-  }),
-  usePlatform: () => ({
-    cancelPendingRemoteConnection: vi.fn(async () => {}),
-  }),
-}));
-
-vi.mock("@/hooks/useServices.js", () => ({
-  ServiceProvider: ({ children }: { children: unknown }) => children,
-  useServices: () => ({
-    systemService: {
-      probeIntranet: vi.fn(async () => ({
-        isIntranet: false,
-        targets: [],
-      })),
-    },
-  }),
-  useOptionalServices: () => null,
-}));
-
-vi.mock("@/settings/CodingPlanUpgradeDialogProvider.js", () => ({
-  CodingPlanUpgradeDialogProvider: ({ children }: { children: unknown }) => children,
-  useCodingPlanUpgradeDialog: () => ({
-    openCodingPlanUpgrade: vi.fn(),
-  }),
-}));
-
-vi.mock("@/hooks/useWorkspaceServices.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/hooks/useWorkspaceServices.js")>();
-
-  return {
-    ...actual,
-    // Bugfix: Root 现在会触发 useBaseWorkspaceServices；这里改为部分 mock，
-    // 保留模块真实导出，避免新增 hook 导出时测试因 mock 漏项直接崩溃。
-    // 此 hook 的首参是 workspacePath。旧 mock 原样返回首参，只因早期 return 未读取服务才未暴露。
-    // 数据库 loading 提前订阅工作区服务后，测试也必须返回真实契约形状。
-    useWorkspaceServices: () => ({
-      zcodeAgentService: {
-        prepareStorage: vi.fn(async () => {}),
-        getStorageStartupState: vi.fn(async () => null),
-        onDynamicStorageStartupState: vi.fn(() => () => ({ dispose: vi.fn() })),
-      },
-    }),
-  };
-});
 
 vi.mock("@/hooks/useTabPersistence.js", () => ({
   useTabPersistence: () => ({
@@ -255,7 +198,6 @@ async function renderRoot(options?: {
           update: vi.fn(),
         },
         oauthService: {
-          restoreCachedSession: vi.fn(),
           restoreSession: vi.fn(),
           handleCallback: vi.fn(),
           logout: vi.fn(),

@@ -6,7 +6,6 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { createSqliteSessionStore } from "@zcode/adapters/storage";
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
   ZCODE_SESSION_RUNTIME_PREFERENCES_REQUEST_TIMEOUT_MS,
   zcodeProtocolMethods,
   zcodeMessagePartSchema,
@@ -3444,167 +3443,6 @@ describe("ZCodeProtocolAgentServer", () => {
     );
   });
 
-  it("preserves unapplied zcode-plan runtime headers original failure", async () => {
-    const createdAppOptions: ZCodeAppOptions[] = [];
-    const requestClient = vi.fn(async () => ({
-      headersApplied: false,
-      errorMessage: "Runtime headers helper timed out after 5000ms.",
-    }));
-
-    await createWorkspaceZCodeApp(
-      {
-        deps: {
-          createZCodeApp: (options) => {
-            createdAppOptions.push(options ?? {});
-            return createFakeApp(options);
-          },
-        },
-        notify: () => undefined,
-        requestClient,
-        sessions: new Map(),
-      },
-      workspace,
-      {
-        runtimeConfig: {
-          workingDirectory: workspace.workspacePath,
-        },
-      },
-    );
-
-    const runtimeHeadersPort = createdAppOptions[0]?.providerRuntimeHeadersPort;
-    expect(
-      runtimeHeadersPort?.shouldRefreshBeforeModelRequest?.({
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
-        modelId: "glm-5.1",
-      }),
-    ).toBe(true);
-    expect(
-      runtimeHeadersPort?.shouldRefreshBeforeModelRequest?.({
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
-        modelId: "glm-5.1",
-      }),
-    ).toBe(true);
-    expect(
-      runtimeHeadersPort?.shouldRefreshBeforeModelRequest?.({
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-        modelId: "glm-5.1",
-      }),
-    ).toBe(true);
-
-    await expect(
-      runtimeHeadersPort?.refreshBeforeModelRequest({
-        accountAccess: {
-          type: "zhipu-account",
-          family: "zai",
-          mode: "start-plan",
-        },
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
-        modelId: "glm-5.1",
-        reason: "model-request",
-        sessionId: "sess_test" as never,
-        traceContext: {} as never,
-      }),
-    ).rejects.toThrow("Runtime headers helper timed out after 5000ms.");
-    expect(requestClient).toHaveBeenCalledWith(
-      zcodeProtocolMethods.interactionRequestProviderRuntimeHeaders,
-      expect.objectContaining({
-        accountAccess: expect.objectContaining({
-          mode: "start-plan",
-        }),
-      }),
-      expect.anything(),
-      expect.anything(),
-    );
-  });
-
-  it("does not fail refreshed runtime headers when provider registry revision advances concurrently", async () => {
-    const createdAppOptions: ZCodeAppOptions[] = [];
-    const requestClient = vi.fn(async () => ({
-      headersApplied: true,
-      requestAuth: {
-        apiKey: "request-key",
-        apiKeyId: "real-key-id",
-        headers: { "X-Request": "request-header" },
-      },
-    }));
-
-    await createWorkspaceZCodeApp(
-      {
-        deps: {
-          createZCodeApp: (options) => {
-            createdAppOptions.push(options ?? {});
-            return createFakeApp(options);
-          },
-        },
-        notify: () => undefined,
-        requestClient,
-        sessions: new Map(),
-      },
-      workspace,
-      {
-        runtimeConfig: {
-          workingDirectory: workspace.workspacePath,
-        },
-      },
-    );
-
-    await expect(
-      createdAppOptions[0]?.providerRuntimeHeadersPort?.refreshBeforeModelRequest({
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
-        modelId: "glm-5.1",
-        reason: "model-request",
-        sessionId: "sess_test" as never,
-        traceContext: {} as never,
-      }),
-    ).resolves.toMatchObject({
-      headersApplied: true,
-      requestAuth: {
-        apiKey: "request-key",
-        apiKeyId: "real-key-id",
-        headers: { "X-Request": "request-header" },
-      },
-    });
-    const clock = vi.spyOn(Date, "now").mockReturnValue(1234);
-    try {
-      const port = createdAppOptions[0]!.providerRuntimeHeadersPort!;
-      const input = {
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
-        modelId: "glm-5.1",
-        reason: "model-request" as const,
-        sessionId: "sess_test" as never,
-        traceContext: {} as never,
-      };
-      const results = await Promise.all([
-        port.refreshBeforeModelRequest(input),
-        port.refreshBeforeModelRequest(input),
-      ]);
-      expect(results.map((result) => result.requestAuth)).toEqual([
-        {
-          apiKey: "request-key",
-          apiKeyId: "real-key-id",
-          headers: { "X-Request": "request-header" },
-        },
-        {
-          apiKey: "request-key",
-          apiKeyId: "real-key-id",
-          headers: { "X-Request": "request-header" },
-        },
-      ]);
-      const requests = (
-        requestClient.mock.calls as unknown as Array<
-          [string, { requestId: string; reason: string }]
-        >
-      ).slice(-2);
-      expect(requests[0][1].requestId).not.toBe(requests[1][1].requestId);
-      expect(requests.map(([, request]) => request.reason)).toEqual([
-        "model-request",
-        "model-request",
-      ]);
-    } finally {
-      clock.mockRestore();
-    }
-  });
-
   it("injects protocol MCP servers into session runtime config", async () => {
     const createdAppOptions: ZCodeAppOptions[] = [];
     const server = new ZCodeProtocolAgentServer({
@@ -4774,54 +4612,6 @@ describe("ZCodeProtocolAgentServer", () => {
     expect("settings" in presentation).toBe(false);
   });
 
-  it("通过独立协议同步 Account Config，不再从 Workspace Snapshot 反向投影", async () => {
-    const syncAccountProviderConfig = vi.fn(async () => true);
-    const server = new ZCodeProtocolAgentServer({
-      createZCodeApp: () => createFakeApp(),
-      cwd: workspace.workspacePath,
-      syncAccountProviderConfig,
-    });
-
-    const result = await requestResult(server, {
-      id: 1,
-      method: zcodeProtocolMethods.providerUpdateAccountConfig,
-      params: {
-        revision: "account-1",
-        basedOnZCodeBuiltinRevision: "zcode-builtin:1",
-        states: {
-          "account:zai-individual-coding-plan": {
-            availability: "available",
-            entitled: true,
-            current: false,
-          },
-        },
-        providers: {
-          "account:zai-individual-coding-plan": {
-            access: { type: "zhipu-account", entitled: true },
-            builtinModelIds: ["GLM-5.2"],
-          },
-        },
-      },
-    });
-
-    expect(result).toEqual({
-      receivedRevision: "account-1",
-      providerCount: 1,
-      status: "received",
-    });
-    expect(syncAccountProviderConfig).toHaveBeenCalledTimes(1);
-    const snapshot = syncAccountProviderConfig.mock.calls[0]?.[0];
-    expect(snapshot?.revision).toBe("account-1");
-    expect(snapshot?.basedOnZCodeBuiltinRevision).toBe("zcode-builtin:1");
-    expect(snapshot?.states?.["account:zai-individual-coding-plan"].current).toBe(false);
-    expect(snapshot?.providers.toJSON()).toEqual({
-      "account:zai-individual-coding-plan": {
-        access: { type: "zhipu-account", entitled: true },
-        builtinModelIds: ["GLM-5.2"],
-      },
-    });
-  });
-
   it("workspace presentation rejects legacy runtimeModel", async () => {
     const firstProviderRuntimeModel = {
       generatedAt: 2,
@@ -4899,8 +4689,6 @@ describe("ZCodeProtocolAgentServer", () => {
     let sendInputSettled = false;
     let receivedInputId: string | undefined;
     let receivedBrowserAmbientContext: unknown;
-    let receivedOffPeakTaskId: string | undefined;
-    let receivedOffPeakRunType: string | undefined;
     const sendInputCompletion = new Promise<void>((resolve) => {
       resolveSendInput = resolve;
     });
@@ -4910,8 +4698,6 @@ describe("ZCodeProtocolAgentServer", () => {
           sendInput: async (_input, options) => {
             receivedInputId = options?.inputId;
             receivedBrowserAmbientContext = options?.browserAmbientContext;
-            receivedOffPeakTaskId = options?.offPeakTaskId;
-            receivedOffPeakRunType = options?.offPeakRunType;
             await sendInputCompletion;
             sendInputSettled = true;
             return { kind: "rejected", reason: "no_active_turn" };
@@ -4935,8 +4721,6 @@ describe("ZCodeProtocolAgentServer", () => {
         sessionId: created.session.sessionId,
         content: "hello",
         inputId: "t-sess_test-run",
-        offPeakTaskId: "off-peak-task-1",
-        offPeakRunType: "resume",
         browserAmbientContext: {
           tabCount: 1,
           currentUrl: "https://example.com/current",
@@ -4957,8 +4741,6 @@ describe("ZCodeProtocolAgentServer", () => {
       tabCount: 1,
       currentUrl: "https://example.com/current",
     });
-    expect(receivedOffPeakTaskId).toBe("off-peak-task-1");
-    expect(receivedOffPeakRunType).toBe("resume");
     expect(sendInputSettled).toBe(false);
     resolveSendInput();
     await sendInputCompletion;

@@ -134,7 +134,7 @@ describe("chat error banner telemetry", () => {
           reason: "network_error",
           errorPhase: "stream",
           exceptionKind: "transport",
-          providerId: "account:zai-individual-coding-plan",
+          providerId: "builtin:zai",
           modelId: " GLM-5 ",
           providerKind: "anthropic",
           transport: "sse",
@@ -152,7 +152,7 @@ describe("chat error banner telemetry", () => {
       failure_phase: "stream",
       failure_exception_kind: "transport",
       provider_scope: "builtin",
-      provider_id: "account:zai-individual-coding-plan",
+      provider_id: "builtin:zai",
       model_id: "glm-5",
       provider_kind: "anthropic",
       transport: "sse",
@@ -191,41 +191,6 @@ describe("chat error banner telemetry", () => {
     });
   });
 
-  it("normalizes known plan-expired and balance errors for ARMS only", () => {
-    const planExpired = buildChatErrorBannerTelemetryPayload({
-      displayMessage: "[1309] Coding Plan expired",
-      error: {
-        code: "1309",
-        message: "[1309] Coding Plan expired",
-        attribution: {
-          source: "provider",
-          reason: "unknown",
-          providerId: "account:bigmodel-individual-coding-plan",
-          providerErrorCode: "1309",
-          statusCode: 429,
-        },
-      },
-      providerBusinessRecoveryAction: null,
-    });
-    const insufficientBalance = buildChatErrorBannerTelemetryPayload({
-      displayMessage: "Insufficient Balance",
-      error: {
-        code: "invalid_request_error",
-        message: "Insufficient Balance",
-        attribution: {
-          source: "provider",
-          reason: "unknown",
-          providerErrorCode: "invalid_request_error",
-          statusCode: 402,
-        },
-      },
-      providerBusinessRecoveryAction: null,
-    });
-
-    expect(planExpired.properties?.failure_reason).toBe("plan_expired");
-    expect(insufficientBalance.properties?.failure_reason).toBe("balance_insufficient");
-  });
-
   it("does not apply BigModel business-code meanings to another provider", () => {
     const payload = buildChatErrorBannerTelemetryPayload({
       displayMessage: "Provider request failed",
@@ -261,54 +226,6 @@ describe("chat error banner telemetry", () => {
     });
 
     expect(payload.properties?.failure_reason).toBe("server_error");
-  });
-
-  it("normalizes a trusted terminal quota code without changing adapter retry facts", () => {
-    const payload = buildChatErrorBannerTelemetryPayload({
-      displayMessage: "[1308] usage limit reached",
-      error: {
-        code: "model_rate_limited",
-        message: "[1308] usage limit reached",
-        attribution: {
-          source: "provider",
-          reason: "rate_limited",
-          providerId: "account:zai-individual-coding-plan",
-          providerErrorCode: "1308",
-          retryable: false,
-        },
-      },
-      providerBusinessRecoveryAction: null,
-    });
-
-    expect(payload.properties).toMatchObject({
-      error_source: "provider",
-      failure_reason: "quota_exhausted",
-      failure_retryable: false,
-      provider_error_code: "1308",
-    });
-  });
-
-  it("prefers a trusted provider quota code over a conflicting controlled message", () => {
-    const payload = buildChatErrorBannerTelemetryPayload({
-      displayMessage: "请求过于频繁，请稍后重试",
-      error: {
-        code: "model_rate_limited",
-        message: "请求过于频繁，请稍后重试",
-        attribution: {
-          source: "provider",
-          reason: "unknown",
-          providerId: "account:zai-individual-coding-plan",
-          providerErrorCode: "1308",
-          retryable: false,
-        },
-      },
-      providerBusinessRecoveryAction: null,
-    });
-
-    expect(payload.properties).toMatchObject({
-      error_source: "provider",
-      failure_reason: "quota_exhausted",
-    });
   });
 
   it("uses generic HTTP evidence when the adapter reason is unknown", () => {
@@ -779,11 +696,6 @@ describe("chat error banner telemetry", () => {
         name: "stream read text fallback",
         message: "stream_read_error",
         expected: { error_source: "network", failure_reason: "network_error" },
-      },
-      {
-        name: "off-peak continuation marker",
-        message: "off-peak-ticket-expired: wrong off-peak ticket",
-        expected: { error_source: "runtime", failure_reason: "offpeak_ticket_expired" },
       },
     ] as const;
 
@@ -1287,20 +1199,6 @@ describe("chat error banner telemetry", () => {
   it("normalizes provider evidence that previously remained unknown", () => {
     const cases = [
       {
-        name: "BigModel safety rejection",
-        message: "[1301][Sensitive content rejected]",
-        error: {
-          code: "model_request_failed",
-          message: "[1301][Sensitive content rejected]",
-          attribution: {
-            source: "provider" as const,
-            reason: "unknown",
-            providerId: "account:bigmodel-individual-coding-plan",
-            providerErrorCode: "1301",
-          },
-        },
-      },
-      {
         name: "generic provider bad request",
         message: "No endpoints found that support image input",
         error: {
@@ -1311,21 +1209,6 @@ describe("chat error banner telemetry", () => {
             reason: "unknown",
             providerId: "custom-provider",
             providerErrorCode: "BAD_REQUEST",
-          },
-        },
-      },
-      {
-        name: "provider method not allowed",
-        message: "method not allowed",
-        error: {
-          code: "AiSdkModelAdapterError",
-          message: "method not allowed",
-          attribution: {
-            source: "provider" as const,
-            reason: "unknown",
-            providerId: "account:zai-start-plan",
-            providerErrorCode: "3012",
-            statusCode: 405,
           },
         },
       },
@@ -1374,7 +1257,7 @@ describe("chat error banner telemetry", () => {
         message: "failed",
         attribution: {
           source: "provider",
-          providerId: "account:zai-individual-coding-plan",
+          providerId: "builtin:zai",
           modelId: "customer-internal-model-name",
         },
       },
@@ -1383,7 +1266,7 @@ describe("chat error banner telemetry", () => {
 
     expect(payload.properties).toMatchObject({
       provider_scope: "builtin",
-      provider_id: "account:zai-individual-coding-plan",
+      provider_id: "builtin:zai",
       model_id: "custom",
     });
     expect(Object.values(payload.properties ?? {})).not.toContain("customer-internal-model-name");
@@ -1443,7 +1326,7 @@ describe("chat error banner telemetry", () => {
         message: "failed",
         attribution: {
           source: "runtime",
-          providerId: "account:zai-individual-coding-plan",
+          providerId: "builtin:zai",
         },
       },
       providerBusinessRecoveryAction: null,
@@ -1451,7 +1334,7 @@ describe("chat error banner telemetry", () => {
 
     expect(payload.properties).toMatchObject({
       provider_scope: "builtin",
-      provider_id: "account:zai-individual-coding-plan",
+      provider_id: "builtin:zai",
       model_id: "",
     });
   });

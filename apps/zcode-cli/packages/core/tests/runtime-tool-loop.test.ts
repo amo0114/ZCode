@@ -61,7 +61,6 @@ import { createToolRegistry } from "../src/tool/registry.js";
 import { BackgroundTaskTracker } from "../src/tool/executor/background-tasks.js";
 import type { ToolExecutionContext } from "../src/tool/types.js";
 import { createTestSessionEventStore } from "./test-event-store.js";
-import { START_PLAN_BUSY_AUTO_RETRY_EXHAUSTED_MESSAGE } from "../src/runtime/methods/streaming-recovery.js";
 import type { StableConversationForkChildMetadata } from "../src/runtime/types.js";
 import { formatSubagentMessage } from "../src/runtime/methods/subagent-messages.js";
 import type { BashBackgroundLifecycleExecutionPort } from "../src/tool/handlers/bash-background-lifecycle.js";
@@ -3043,92 +3042,6 @@ describe("AgentRuntime tool loop", () => {
     await runtime.executeTurn("ask a clarification if needed");
 
     expect(toolNames).toContain("AskUserQuestion");
-  });
-
-  it("refreshes provider runtime headers before every model request in a tool loop", async () => {
-    const sessionId = createSessionId("runtime-provider-runtime-headers-per-request");
-    const eventStore = createTestSessionEventStore();
-    const registry = createToolRegistry();
-    registry.register({
-      inputSchema: {},
-      metadata: {
-        concurrentSafe: true,
-        destructive: false,
-        name: "ReadMarker",
-        needsApproval: false,
-        readOnly: true,
-        riskLevel: "low",
-        sideEffectScope: "none",
-      },
-      handler: async () => "marker-ok",
-    });
-    const refreshes: string[] = [];
-    let modelCallCount = 0;
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "yolo",
-        modelSelection: createTestModelSelection({
-          providerId: "account:zai-individual-coding-plan",
-          modelId: "glm-5.1",
-        }),
-      },
-      {
-        eventStore,
-        toolRegistry: registry,
-        providerRuntimeHeadersPort: {
-          shouldRefreshBeforeModelRequest: ({ providerId }) =>
-            providerId === "account:zai-individual-coding-plan",
-          async refreshBeforeModelRequest(input) {
-            refreshes.push(`${input.providerId}:${input.reason}`);
-            return {
-              headersApplied: true,
-            };
-          },
-        },
-        modelFactory: createTestModelFactory({
-          async generateText(request: any, observation) {
-            await observation.invocationContext?.refreshRuntimeHeadersBeforeAttempt?.({
-              attempt: 1,
-              abortSignal: request.abortSignal,
-              providerId: String(observation.model.providerId),
-              modelId: String(observation.model.modelId),
-              traceContext: observation.invocationContext?.traceContext,
-            });
-            modelCallCount++;
-            if (modelCallCount === 1) {
-              return {
-                finishReason: "tool-calls",
-                providerMetadata: undefined,
-                text: "",
-                toolCalls: [
-                  {
-                    id: "tool-read-marker",
-                    name: "ReadMarker",
-                    input: {},
-                  },
-                ],
-                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-              };
-            }
-            return {
-              finishReason: "stop",
-              providerMetadata: undefined,
-              text: "done",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-      },
-    );
-
-    await runtime.executeTurn("read marker then answer");
-
-    expect(modelCallCount).toBe(2);
-    expect(refreshes).toEqual([
-      "account:zai-individual-coding-plan:model-request",
-      "account:zai-individual-coding-plan:model-request",
-    ]);
   });
 
   it("continues an active target when idle and accounts usage", async () => {
@@ -6173,109 +6086,6 @@ describe("AgentRuntime tool loop", () => {
       providerTotalTokens: 24,
       status: "completed",
     });
-  });
-
-  it("retries Start Plan 3010 before injecting verifier nextAction", async () => {
-    vi.useFakeTimers();
-    const sessionId = createSessionId("runtime-target-verify-fail");
-    const eventStore = createTestSessionEventStore();
-    const sessionStore = new RecordingSessionStore();
-    const requests: any[] = [];
-    const observations: TestModelExecutionObservation[] = [];
-    let modelCallCount = 0;
-    const providerId = "account:bigmodel-start-plan";
-
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "build",
-        modelSelection: {
-          modelId: "GLM-5.2" as never,
-          providerId: providerId as never,
-        },
-        workingDirectory: "/tmp/zcode-runtime-target",
-      },
-      {
-        eventStore,
-        modelFactory: createTestModelFactory({
-          async generateText(request: any, observation) {
-            requests.push(request);
-            observations.push(observation);
-            modelCallCount++;
-            if (modelCallCount === 1) {
-              return {
-                finishReason: "stop",
-                providerMetadata: undefined,
-                text: "plan finished",
-                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-              };
-            }
-            if (modelCallCount === 2) {
-              throw createProviderBusyError(providerId);
-            }
-            if (modelCallCount === 3) {
-              return {
-                finishReason: "stop",
-                providerMetadata: undefined,
-                text: JSON.stringify({
-                  nextAction: "Inspect the implementation and run the requested tests.",
-                  passed: false,
-                  reason: "A completed plan does not prove the target is complete.",
-                }),
-                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-              };
-            }
-            return {
-              finishReason: "stop",
-              providerMetadata: undefined,
-              text: "continuing target",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-        sessionStore,
-      },
-    );
-
-    try {
-      await runtime.ensureSessionPersistedForExternalActivity("/goal Verify fail");
-      await sessionStore.setTarget({
-        objective: "Implement target, not just a plan",
-        sessionID: sessionId,
-      });
-
-      await runtime.executeTurn("finish target too early");
-      const resultPromise = runtime.continueActiveTargetIfIdle({
-        verifyBeforeContinue: true,
-      });
-      await vi.advanceTimersByTimeAsync(1_000);
-      const result = await resultPromise;
-      const stored = await sessionStore.readTarget({ sessionID: sessionId });
-      const events = await eventStore.getEvents(sessionId);
-      const nextModelContext = requests[3]?.messages
-        .map((message: any) => message.content)
-        .join("\n");
-
-      expect(result?.response).toBe("continuing target");
-      expect(modelCallCount).toBe(4);
-      expect(observations[1]?.invocationContext?.modelRequestSessionType).toBe("main");
-      expect(observations[2]?.invocationContext?.modelRequestSessionType).toBe("main");
-      expect(stored?.status).toBe("active");
-      expect(nextModelContext).toContain("completion verifier");
-      expect(nextModelContext).toContain("A completed plan does not prove the target is complete.");
-      expect(nextModelContext).toContain("Inspect the implementation and run the requested tests.");
-      expect(nextModelContext).toContain("Continue working toward the active session goal.");
-      expect(nextModelContext).not.toContain("GoalUpdate");
-      expect(
-        events.some(
-          (event) =>
-            event.type === SessionEventType.ModelComplete &&
-            (event.payload as any).querySource === GOAL_COMPLETION_VERIFICATION_QUERY_SOURCE,
-        ),
-      ).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it("completes the goal when post-turn completion verification fails open", async () => {
@@ -10105,7 +9915,7 @@ describe("AgentRuntime tool loop", () => {
       const registry = createToolRegistry();
       const toolStarted = deferred();
       const toolCompleted = deferred();
-      const highspeedProviderId = "account:zai-highspeed-card";
+      const scopedProviderId = "account:zai-team-coding-plan";
       let toolHandlerCallCount = 0;
       let fallbackRequest: any;
 
@@ -10150,7 +9960,7 @@ describe("AgentRuntime tool loop", () => {
             },
             async *streamText(request: any, observation) {
               const providerId = String(observation.model.providerId);
-              if (providerId !== highspeedProviderId) {
+              if (providerId !== scopedProviderId) {
                 fallbackRequest = request;
                 yield { type: "text_delta", text: "fallback completed" };
                 yield {
@@ -10168,7 +9978,7 @@ describe("AgentRuntime tool loop", () => {
               await toolStarted.promise;
               if (executionState === "completed") await toolCompleted.promise;
               yield { type: "text_delta", text: "discarded accelerated tail" };
-              throw Object.assign(new Error("highspeed stream disconnected"), {
+              throw Object.assign(new Error("scoped stream disconnected"), {
                 code: "model_request_failed",
                 context: {
                   providerId,
@@ -10190,12 +10000,12 @@ describe("AgentRuntime tool loop", () => {
           sourceCommandId: `command-fallback-tool-${executionState}`,
           kind: "sendText",
           requestedDelivery: "start-now",
-          modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+          modelSelection: { providerId: scopedProviderId, modelId: "GLM-5.3" },
         },
         modelExecution: {
           selectionScope: "execution",
           selectionFallback: {
-            providerId: highspeedProviderId,
+            providerId: scopedProviderId,
             rules: [{ reason: "highspeed_request_failed" }],
           },
         },
@@ -10207,7 +10017,7 @@ describe("AgentRuntime tool loop", () => {
         (message: any) => message.role === "assistant" && message.toolCalls?.length > 0,
       );
       expect(fallbackAssistant).toMatchObject({
-        providerId: highspeedProviderId,
+        providerId: scopedProviderId,
         modelId: "GLM-5.3",
         toolCalls: [{ id: "fallback-read", name: "FallbackRead", input: {} }],
       });
@@ -10242,7 +10052,7 @@ describe("AgentRuntime tool loop", () => {
         ?.find(
           (message) =>
             message.role === "assistant" &&
-            message.providerId === highspeedProviderId &&
+            message.providerId === scopedProviderId &&
             message.error?.name === STREAM_RECOVERY_DISCARDED_ERROR_NAME,
         );
       expect(discardedAssistant).toMatchObject({
@@ -10297,7 +10107,7 @@ describe("AgentRuntime tool loop", () => {
       const registry = createToolRegistry();
       const toolStarted = deferred();
       const toolCompleted = deferred();
-      const highspeedProviderId = "account:zai-highspeed-card";
+      const scopedProviderId = "account:zai-team-coding-plan";
       const unavailableFallbackProviderId = "ghost-provider";
       const streamedProviders: string[] = [];
       let toolHandlerCallCount = 0;
@@ -10324,7 +10134,7 @@ describe("AgentRuntime tool loop", () => {
         },
       });
 
-      const highspeedModelFactory = createTestModelFactory({
+      const scopedModelFactory = createTestModelFactory({
         async generateText() {
           throw new Error("streaming runtime must not call generateText");
         },
@@ -10341,7 +10151,7 @@ describe("AgentRuntime tool loop", () => {
           };
           await toolStarted.promise;
           if (executionState === "completed") await toolCompleted.promise;
-          throw Object.assign(new Error("highspeed unavailable-target stream failed"), {
+          throw Object.assign(new Error("scoped unavailable-target stream failed"), {
             code: "model_request_failed",
             context: {
               providerId,
@@ -10370,7 +10180,7 @@ describe("AgentRuntime tool loop", () => {
             if (factoryInput.selection.providerId === unavailableFallbackProviderId) {
               throw new Error("fallback provider is unavailable");
             }
-            return highspeedModelFactory(factoryInput);
+            return scopedModelFactory(factoryInput);
           },
         },
       );
@@ -10383,12 +10193,12 @@ describe("AgentRuntime tool loop", () => {
             sourceCommandId: `command-unavailable-fallback-tool-${executionState}`,
             kind: "sendText",
             requestedDelivery: "start-now",
-            modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+            modelSelection: { providerId: scopedProviderId, modelId: "GLM-5.3" },
           },
           modelExecution: {
             selectionScope: "execution",
             selectionFallback: {
-              providerId: highspeedProviderId,
+              providerId: scopedProviderId,
               rules: [{ reason: "highspeed_request_failed" }],
               target: { providerId: unavailableFallbackProviderId, modelId: "ghost-model" },
             },
@@ -10402,9 +10212,9 @@ describe("AgentRuntime tool loop", () => {
       expect(failure).toBeInstanceOf(Error);
       const causeMessage = failure?.cause instanceof Error ? failure.cause.message : undefined;
       expect([failure?.message, causeMessage]).toContain(
-        "highspeed unavailable-target stream failed",
+        "scoped unavailable-target stream failed",
       );
-      expect(streamedProviders).toEqual([highspeedProviderId]);
+      expect(streamedProviders).toEqual([scopedProviderId]);
       expect(toolHandlerCallCount).toBe(1);
 
       const persistedToolParts = (sessionStore.partsBySession.get(sessionId) ?? []).filter(
@@ -10484,8 +10294,8 @@ describe("AgentRuntime tool loop", () => {
     const eventStore = createTestSessionEventStore();
     const registry = createToolRegistry();
     const toolCompleted = deferred();
-    const highspeedProviderId = "account:zai-highspeed-card";
-    let highspeedCallCount = 0;
+    const scopedProviderId = "account:zai-team-coding-plan";
+    let scopedCallCount = 0;
     let fallbackCallCount = 0;
     let toolHandlerCallCount = 0;
 
@@ -10524,10 +10334,10 @@ describe("AgentRuntime tool loop", () => {
           },
           async *streamText(_request: any, observation) {
             const providerId = String(observation.model.providerId);
-            if (providerId === highspeedProviderId) {
-              highspeedCallCount++;
-              if (highspeedCallCount <= 3) {
-                yield { type: "text_delta", text: `accelerated part ${highspeedCallCount}` };
+            if (providerId === scopedProviderId) {
+              scopedCallCount++;
+              if (scopedCallCount <= 3) {
+                yield { type: "text_delta", text: `accelerated part ${scopedCallCount}` };
                 yield { type: "finish", finishReason: "length", usage: {} };
                 return;
               }
@@ -10540,7 +10350,7 @@ describe("AgentRuntime tool loop", () => {
                 },
               };
               await toolCompleted.promise;
-              throw Object.assign(new Error("highspeed failed after continuation tool"), {
+              throw Object.assign(new Error("scoped request failed after continuation tool"), {
                 code: "model_request_failed",
                 context: {
                   providerId,
@@ -10576,19 +10386,19 @@ describe("AgentRuntime tool loop", () => {
         sourceCommandId: "command-fallback-tool-continuation-reset",
         kind: "sendText",
         requestedDelivery: "start-now",
-        modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        modelSelection: { providerId: scopedProviderId, modelId: "GLM-5.3" },
       },
       modelExecution: {
         selectionScope: "execution",
         selectionFallback: {
-          providerId: highspeedProviderId,
+          providerId: scopedProviderId,
           rules: [{ reason: "highspeed_request_failed" }],
         },
       },
     });
 
     expect(result.response).toBe("fallback completed");
-    expect(highspeedCallCount).toBe(4);
+    expect(scopedCallCount).toBe(4);
     expect(fallbackCallCount).toBe(2);
     expect(toolHandlerCallCount).toBe(1);
   });
@@ -10828,190 +10638,6 @@ describe("AgentRuntime tool loop", () => {
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     ]);
     expect(retryStartedPayloads.every((payload) => payload.maxRetries === 10)).toBe(true);
-  });
-
-  it("marks Start Plan busy stream recovery exhaustion in the final turn error", async () => {
-    const sessionId = createSessionId("runtime-start-plan-busy-recovery-exhausted");
-    const eventStore = createTestSessionEventStore();
-    let modelCallCount = 0;
-
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      { mode: "yolo", modelStreaming: "on" },
-      {
-        eventStore,
-        modelFactory: createTestModelFactory({
-          async generateText() {
-            throw new Error("generateText should not be used");
-          },
-          async *streamText() {
-            modelCallCount++;
-            yield { type: "text_delta", text: `partial ${modelCallCount}` };
-            const error = new Error("当前系统繁忙，请稍后再试或升级账户。") as Error & {
-              code?: string;
-              context?: Record<string, unknown>;
-            };
-            error.code = "model_rate_limited";
-            error.context = {
-              providerCode: "3010",
-              reason: "rate_limited",
-              retryable: true,
-            };
-            throw error;
-          },
-        } as never),
-      },
-    );
-
-    await expect(runtime.executeTurn("recover busy until exhausted")).rejects.toMatchObject({
-      type: CoreErrorType.UnknownError,
-    });
-    const events = await eventStore.getEvents(sessionId);
-    const turnErrorPayload = events.find((event) => event.type === SessionEventType.TurnError)
-      ?.payload as any;
-
-    expect(modelCallCount).toBe(11);
-    expect(
-      events.filter((event) => event.type === SessionEventType.StreamRecoveryRetryStarted),
-    ).toHaveLength(10);
-    expect(turnErrorPayload.error).toMatchObject({
-      code: "3010",
-      message: START_PLAN_BUSY_AUTO_RETRY_EXHAUSTED_MESSAGE,
-    });
-    expect(turnErrorPayload.error.detail).toContain("provider_code=3010");
-  });
-
-  it("does not retry Start Plan busy admission failures on the first turn", async () => {
-    const sessionId = createSessionId("runtime-start-plan-first-admission-busy-no-retry");
-    const eventStore = createTestSessionEventStore();
-    const providerId = "account:zai-start-plan";
-    let modelCallCount = 0;
-
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "yolo",
-        modelSelection: {
-          modelId: "GLM-5.2" as never,
-          providerId: providerId as never,
-        },
-        modelStreaming: "on",
-      },
-      {
-        eventStore,
-        modelFactory: createTestModelFactory({
-          async generateText() {
-            throw new Error("generateText should not be used");
-          },
-          async *streamText() {
-            modelCallCount++;
-            yield { type: "error", error: createProviderBusyError(providerId) };
-          },
-        } as never),
-      },
-    );
-
-    await expect(runtime.executeTurn("first prompt")).rejects.toMatchObject({
-      type: CoreErrorType.ModelError,
-    });
-
-    const events = await eventStore.getEvents(sessionId);
-    expect(modelCallCount).toBe(1);
-    expect(
-      events.filter((event) => event.type === SessionEventType.StreamRecoveryRetryStarted),
-    ).toHaveLength(0);
-  });
-
-  it("retries Start Plan busy admission failures after a visible turn", async () => {
-    vi.useFakeTimers();
-    const sessionId = createSessionId("runtime-start-plan-second-admission-busy-retry");
-    const eventStore = createTestSessionEventStore();
-    const sessionStore = new RecordingSessionStore();
-    const providerId = "account:zai-start-plan";
-    const requestModel = {
-      modelId: "GLM-5.2" as never,
-      providerId: providerId as never,
-    };
-    const selectedModel = createTestModelSelection("provider-new/model-new");
-    let modelCallCount = 0;
-
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "yolo",
-        modelSelection: createTestModelSelection(requestModel),
-        modelStreaming: "on",
-      },
-      {
-        eventStore,
-        sessionStore,
-        modelFactory: createTestModelFactory({
-          async generateText() {
-            throw new Error("generateText should not be used");
-          },
-          async *streamText() {
-            modelCallCount++;
-            if (modelCallCount === 1) {
-              yield { type: "text_delta", text: "first done" };
-              yield {
-                type: "finish",
-                finishReason: "stop",
-                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-              };
-              return;
-            }
-            if (modelCallCount === 2) {
-              runtime.setSessionModelSelection(createTestModelSelection(selectedModel));
-              yield {
-                type: "error",
-                error: createProviderBusyError(providerId),
-              };
-              return;
-            }
-            yield { type: "text_delta", text: "second done" };
-            yield {
-              type: "finish",
-              finishReason: "stop",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-      },
-    );
-
-    try {
-      const first = await runtime.executeTurn("first prompt");
-      const secondPromise = runtime.executeTurn("second prompt");
-      await vi.advanceTimersByTimeAsync(1_000);
-      const second = await secondPromise;
-      const events = await eventStore.getEvents(sessionId);
-      const retryStartedPayloads = events
-        .filter((event) => event.type === SessionEventType.StreamRecoveryRetryStarted)
-        .map((event) => event.payload as any);
-
-      expect(first.response).toBe("first done");
-      expect(second.response).toBe("second done");
-      expect(modelCallCount).toBe(3);
-      expect(retryStartedPayloads).toHaveLength(1);
-      expect(retryStartedPayloads[0]).toMatchObject({
-        retryNumber: 1,
-        maxRetries: 2,
-      });
-      expect(
-        sessionStore.messagesBySession
-          .get(sessionId)
-          ?.find(
-            (message) =>
-              message.role === "assistant" &&
-              message.finish === "start_plan_admission_retry_discarded",
-          ),
-      ).toMatchObject({
-        modelId: requestModel.modelId,
-        providerId: requestModel.providerId,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it("continues stream recovery with a synthetic failed result for side-effecting tools", async () => {

@@ -499,12 +499,10 @@ describe("script workflow child runtime — 对外交互端口由父 runtime 铸
 
   let tempRoot: string;
   let parentRuntime: AgentRuntime;
-  let refreshes: Array<{ providerId: string; routedSessionId?: string }>;
   let permissionRequests: Array<{ sessionId: string; origin?: unknown }>;
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "zcode-actor-routing-"));
-    refreshes = [];
     permissionRequests = [];
     parentRuntime = createTestAgentRuntime(
       parentSessionId,
@@ -512,15 +510,6 @@ describe("script workflow child runtime — 对外交互端口由父 runtime 铸
       {
         eventStore: createInMemorySessionEventStore(),
         fileSystemPort: createNodeFileSystemAdapter(),
-        // 主 runtime 的端口：每次调用报自己的 sessionId；child 拿到的是父 runtime 派生的实例，
-        // 派生层把 sessionId 改写成父会话（core 的 child-client-ports.ts）。
-        providerRuntimeHeadersPort: {
-          shouldRefreshBeforeModelRequest: () => true,
-          async refreshBeforeModelRequest(input) {
-            refreshes.push({ providerId: input.providerId, routedSessionId: input.sessionId });
-            return { headersApplied: true };
-          },
-        },
         modelFactory: routingModelFactory,
         permissionBroker: {
           async requestPermission(request) {
@@ -536,11 +525,8 @@ describe("script workflow child runtime — 对外交互端口由父 runtime 铸
     await rm(tempRoot, { force: true, recursive: true });
   });
 
-  // 真实 adapter 在每次 attempt 发出前刷新 runtime headers；这里照做，好让断言落在真实链路上
-  // （runtime deps → 调用上下文 → 端口）。
   const routingModelFactory = createTestModelFactory({
-    async generateText(_request, observation) {
-      await observation.invocationContext?.refreshRuntimeHeadersBeforeAttempt?.({ attempt: 1 });
+    async generateText() {
       return {
         finishReason: "stop",
         providerMetadata: undefined,
@@ -583,15 +569,6 @@ describe("script workflow child runtime — 对外交互端口由父 runtime 铸
       traceContext: createRootTraceContext({ sessionId: parentSessionId }),
     });
   }
-
-  it("actor 的 provider runtime headers 刷新以父会话为路由身份", async () => {
-    const actorRuntime = makeActorRuntime();
-    await actorRuntime.executeTurn("go");
-
-    expect(refreshes.length).toBeGreaterThan(0);
-    // 端口入参里的 sessionId 必须是父会话：桌面只订阅父 task 的会话，带子会话去问没人应答。
-    expect(refreshes.every((entry) => entry.routedSessionId === parentSessionId)).toBe(true);
-  });
 
   it("父 runtime 铸造的 permission broker 带父会话身份与子代理 origin", async () => {
     // 这正是 createScriptWorkflowAgentRuntime 装进 actor deps 的那一份（见实现里的

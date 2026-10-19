@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { expect, it, vi } from "vitest";
 import { NodeZCodeBuiltinProviderConfigSource, decodeZCodeBuiltinRelease } from "../src/index.js";
 
-it("两个真实消费进程观察同一 Active 原子替换，各自发布同版 Account / Registry", async () => {
+it("两个真实消费进程观察同一 Active 原子替换，各自发布同版 Registry", async () => {
   const root = await mkdtemp(join(tmpdir(), "builtin-process-"));
   const release = {
     schemaVersion: 1,
@@ -32,7 +32,7 @@ it("两个真实消费进程观察同一 Active 原子替换，各自发布同�
     watch: false,
   });
   const children: ChildProcess[] = [];
-  const messages: { pid: number; builtin: string; account: string }[] = [];
+  const messages: { pid: number; builtin: string }[] = [];
   try {
     await source.read();
     for (let index = 0; index < 2; index++) {
@@ -62,7 +62,6 @@ it("两个真实消费进程观察同一 Active 原子替换，各自发布同�
         ).toBe(2),
       { timeout: 10_000 },
     );
-    expect(messages.every((message) => message.builtin === message.account)).toBe(true);
   } finally {
     source.dispose();
     await Promise.all(

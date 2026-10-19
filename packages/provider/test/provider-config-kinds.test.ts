@@ -1,13 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ApiKeyAccessConfig,
   ProviderApiConfig,
   ProviderConfig,
-  ProviderConfigMap,
+  parsePersonalModelConfigRules,
   parsePersonalProviderConfigMap,
-  ZhipuAccountAccessConfig,
   parseProviderConfig,
-  parseProviderConfigMap,
+  parseZCodeBuiltinModelConfigRules,
+  parseZCodeBuiltinProviderConfigRules,
 } from "../src/index.js";
 
 describe("ProviderConfig access / api boundaries", () => {
@@ -79,41 +79,6 @@ describe("ProviderConfig access / api boundaries", () => {
     ).toThrow();
   });
 
-  it("智谱账号 Access 使用独立 Schema 且不能携带 API Key", () => {
-    const providers = parseProviderConfigMap([
-      {
-        providerId: "plan",
-        providerName: "Coding Plan",
-        config: {
-          access: {
-            type: "zhipu-account",
-          },
-          api: {
-            type: "anthropic-messages",
-            baseUrl: "https://plan.example.com/anthropic",
-            headers: { "X-Static": "zcodeBuiltin" },
-          },
-          builtinModelIds: ["glm-5"],
-        },
-      },
-    ]);
-
-    expect(providers.get("plan")?.access).toBeInstanceOf(ZhipuAccountAccessConfig);
-    expect(() =>
-      parseProviderConfigMap([
-        {
-          providerId: "plan",
-          config: {
-            access: {
-              type: "zhipu-account",
-              apiKey: "must-not-be-here",
-            },
-          },
-        },
-      ]),
-    ).toThrow();
-  });
-
   it("Provider Config 不接受关闭 Usage 的执行开关", () => {
     expect(() =>
       parseProviderConfig({
@@ -123,46 +88,19 @@ describe("ProviderConfig access / api boundaries", () => {
     ).toThrow();
   });
 
-  it("把隐藏性与智谱闲时模式解析为正式 Provider 配置", () => {
-    const config = parseProviderConfig({
-      group: "zai-family",
-      visibility: "hidden",
-      access: { type: "zhipu-account", accountType: "zai", mode: "off-peak", entitled: true },
-      api: {
-        type: "anthropic-messages",
-        baseUrl: "https://zcode.z.ai/api/v1/off-peak/anthropic",
-      },
-      builtinModelIds: ["GLM-5.2"],
-    });
-
-    expect(config.visibility).toBe("hidden");
-    expect(config.access).toBeInstanceOf(ZhipuAccountAccessConfig);
-    expect(config.validateComplete()).toEqual([]);
-    expect(JSON.parse(JSON.stringify(config))).toEqual({
-      group: "zai-family",
-      visibility: "hidden",
-      access: { type: "zhipu-account", accountType: "zai", mode: "off-peak", entitled: true },
-      api: {
-        type: "anthropic-messages",
-        baseUrl: "https://zcode.z.ai/api/v1/off-peak/anthropic",
-      },
-      builtinModelIds: ["GLM-5.2"],
-    });
-  });
-
   it("hidden 不放宽 Provider 完整性，旧 executionOnly 中间格式不再接受", () => {
     const hidden = new ProviderConfig({
-      group: "zai-family",
+      group: "standard-personal",
       visibility: "hidden",
-      access: new ZhipuAccountAccessConfig({ accountType: "zai", mode: "off-peak" }),
+      access: new ApiKeyAccessConfig({ apiKey: "key" }),
       api: new ProviderApiConfig({ type: "anthropic-messages" }),
       builtinModelIds: ["GLM-5.2"],
     });
 
-    expect(hidden.validateComplete(["providers", "account:zai-offpeak-idle-plan"])).toContainEqual({
+    expect(hidden.validateComplete(["providers", "hidden"])).toContainEqual({
       code: "required-field-missing",
-      path: ["providers", "account:zai-offpeak-idle-plan", "api", "baseUrl"],
-      message: "缺少必填配置 providers.account:zai-offpeak-idle-plan.api.baseUrl",
+      path: ["providers", "hidden", "api", "baseUrl"],
+      message: "缺少必填配置 providers.hidden.api.baseUrl",
     });
     expect(() =>
       parseProviderConfig({
@@ -181,33 +119,6 @@ describe("ProviderConfig access / api boundaries", () => {
     expect(builtIn.overlay(new ProviderConfig({ visibility: "visible" })).visibility).toBe(
       "visible",
     );
-  });
-
-  it("Account 层可以在最后补入账号约束和模型成员", () => {
-    const zcodeBuiltin = new ProviderConfig({
-      group: "zai-family",
-      access: new ZhipuAccountAccessConfig({
-        accountType: "zai",
-        mode: "individual-coding-plan",
-      }),
-      api: new ProviderApiConfig({
-        type: "anthropic-messages",
-        baseUrl: "https://plan.example.com/anthropic",
-      }),
-    });
-    const account = new ProviderConfig({
-      access: new ZhipuAccountAccessConfig({
-        entitled: true,
-      }),
-      builtinModelIds: ["glm-5"],
-    });
-
-    expect(zcodeBuiltin.validateComplete(["providers", "plan"])).toContainEqual({
-      code: "required-field-missing",
-      path: ["providers", "plan", "access", "entitled"],
-      message: "缺少必填配置 providers.plan.access.entitled",
-    });
-    expect(zcodeBuiltin.overlay(account).validateComplete()).toEqual([]);
   });
 
   it("API Key Access 必须在最终 Overlay 后取得 API Key", () => {
@@ -251,67 +162,144 @@ describe("ProviderConfig access / api boundaries", () => {
     });
   });
 
-  it("后层显式切换 Access 类型时整体采用新的访问方式", () => {
-    const zcodeBuiltin = new ProviderConfigMap([
-      [
-        "provider",
-        new ProviderConfig({
-          access: new ApiKeyAccessConfig({ apiKey: "old-key" }),
-          builtinModelIds: ["model-a"],
-        }),
-      ],
-    ]);
-    const account = new ProviderConfigMap([
-      [
-        "provider",
-        new ProviderConfig({
-          access: new ZhipuAccountAccessConfig({
-            accountType: "zai",
-            mode: "individual-coding-plan",
-          }),
-        }),
-      ],
-    ]);
-
-    expect(zcodeBuiltin.overlay(account).get("provider")?.access).toMatchObject({
-      type: "zhipu-account",
-    });
-  });
-
-  it("Team Account Access 只保存静态 family 与 mode", () => {
-    const access = new ZhipuAccountAccessConfig({
-      accountType: "bigmodel",
-      mode: "team-coding-plan",
-      entitled: true,
-    });
-
-    expect(access.validateComplete(["access"])).toEqual([]);
-    expect(access.toJSON()).toEqual({
-      type: "zhipu-account",
-      accountType: "bigmodel",
-      mode: "team-coding-plan",
-      entitled: true,
-    });
-  });
-
   it("正式 Access Schema 拒绝 execution-provided 与伪通用协议字段", () => {
     expect(() => parseProviderConfig({ access: { type: "execution-provided" } })).toThrow();
-    for (const field of ["planKind", "challenge", "requestSigning", "executionProtocol"]) {
-      expect(() =>
-        parseProviderConfig({
-          access: {
-            type: "zhipu-account",
-            accountType: "zai",
-            mode: "start-plan",
-            [field]: "legacy",
-          },
-        }),
-      ).toThrow();
-    }
+    expect(() => parseProviderConfig({ access: { type: "zhipu-account" } })).toThrow();
     expect(() =>
       parseProviderConfig({
         access: { type: "api-key", apiKey: "secret", requestSigning: "zcode-v4" },
       }),
     ).toThrow();
+  });
+  // P2 清洗范围验证：只剔除本阶段退役的 4 个精确 ID，其余 `account:*` 覆盖规则必须保留。
+
+  // P2 清洗边界验证：清洗只认精确 ID，不能按 `account:` 前缀扩大范围。
+  // `account:zai-individual-coding-plan` 属于 P4 的处理范围，本阶段必须原样保留。
+
+  // D4a：智谱账号接入退役后，旧个人配置中的 account:* 条目在解码边界剔除，其余照常加载。
+  it("个人配置含 account:* 覆盖规则时剔除这些条目，其余 provider 仍正常加载", () => {
+    const providers = parsePersonalProviderConfigMap({
+      providerRules: [
+        {
+          providerId: "my-provider",
+          config: {
+            group: "standard-personal",
+            access: { type: "api-key", apiKey: "secret" },
+            api: { type: "openai-chat-completions", baseUrl: "https://api.example.com" },
+            personalModelIds: ["model-a"],
+          },
+        },
+        { providerId: "account:zai-individual-coding-plan", config: { modelOrder: ["GLM-5.3"] } },
+        { providerId: "account:bigmodel-team-coding-plan", enabled: false, config: {} },
+      ],
+    });
+
+    expect(providers.keys()).toEqual(["my-provider"]);
+    expect(providers.get("my-provider")?.personalModelIds).toEqual(["model-a"]);
+  });
+
+  // D5：旧套餐 Key 类型按普通 API Key 读取，保留 Key 与管理入口。
+  it("zhipu-coding-plan-api-key 按 api-key 读取并保留 Key", () => {
+    const providers = parsePersonalProviderConfigMap({
+      providerRules: [
+        {
+          providerId: "my-zai",
+          templateId: "zai-api",
+          config: {
+            access: {
+              type: "zhipu-coding-plan-api-key",
+              apiKey: "secret",
+              apiKeyManagementUrl: "https://z.ai/manage-apikey/apikey-list",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(providers.get("my-zai")?.access?.toJSON()).toEqual({
+      type: "api-key",
+      apiKey: "secret",
+      apiKeyManagementUrl: "https://z.ai/manage-apikey/apikey-list",
+    });
+  });
+
+  it("个人模型规则中引用 account:* 的条目被剔除", () => {
+    const rules = parsePersonalModelConfigRules({
+      providerModelRules: [
+        { providerId: "account:zai-start-plan", modelId: "GLM-5.3", config: { enabled: false } },
+        { providerId: "my-provider", modelId: "model-a", config: { enabled: false } },
+      ],
+      manualProviderModelRules: [],
+    });
+
+    expect(rules.getExact("account:zai-start-plan", "GLM-5.3")).toBeUndefined();
+    expect(rules.getExact("my-provider", "model-a")?.toJSON()).toEqual({ enabled: false });
+  });
+
+  // D2/D10：远端 Release 仍可能下发 zhipu-account 规则与 family group，必须逐条忽略而非整份拒绝。
+  it("内置规则中的 zhipu-account Provider、family group 与关联模型规则被逐条忽略", () => {
+    const { providers, providerTemplates } = parseZCodeBuiltinProviderConfigRules({
+      templateRules: [
+        {
+          templateId: "zai-api",
+          templateNameMap: { "zh-CN": "Z.ai Coding Plan" },
+          config: {
+            access: { type: "zhipu-coding-plan-api-key" },
+            api: { type: "anthropic-messages", baseUrl: "https://api.z.ai/api/anthropic" },
+          },
+        },
+      ],
+      providerRules: [
+        {
+          providerId: "account:zai-individual-coding-plan",
+          config: {
+            group: "zai-family",
+            access: { type: "zhipu-account", accountType: "zai", mode: "individual-coding-plan" },
+            api: { type: "anthropic-messages", baseUrl: "https://api.z.ai/api/anthropic" },
+          },
+        },
+        {
+          providerId: "builtin-api",
+          config: {
+            group: "standard-personal",
+            access: { type: "api-key" },
+            api: { type: "anthropic-messages", baseUrl: "https://example.com" },
+          },
+        },
+      ],
+    });
+    const models = parseZCodeBuiltinModelConfigRules({
+      modelRules: [],
+      modelApiRules: [],
+      providerSiteRules: [],
+      templateModelRules: [],
+      builtinProviderModelRules: [
+        {
+          providerId: "account:zai-individual-coding-plan",
+          modelId: "GLM-5.3",
+          config: { enabled: true },
+        },
+      ],
+    });
+
+    expect(providers.keys()).toEqual(["builtin-api"]);
+    expect(providerTemplates.get("zai-api")?.config.access?.type).toBe("api-key");
+    expect(models.toZCodeBuiltinJSON().builtinProviderModelRules).toEqual([]);
+  });
+
+  it("个人配置轮询重复解析时，同一退役条目只 warn 一次", async () => {
+    vi.resetModules();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { parsePersonalProviderConfigMap: parseFresh } = await import("../src/index.js");
+      const input = {
+        providerRules: [{ providerId: "account:zai-start-plan", config: {} }],
+      };
+      parseFresh(input);
+      parseFresh(input);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

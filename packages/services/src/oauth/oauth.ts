@@ -22,10 +22,7 @@ export interface IOAuthService {
   /** 获取当前 active provider */
   getActiveProvider(): Promise<OAuthProviderId | null>;
 
-  /** 启动时从本地缓存恢复会话展示态：成功返回用户信息，不做远端 token 校验 */
-  restoreCachedSession(): Promise<UserInfo | null>;
-
-  /** 恢复本地展示态，并区分从未登录与 JWT 过期后需要重新认证。 */
+  /** 启动时从本地缓存恢复会话展示态，不做远端 token 校验。 */
   restoreCachedSessionState(): Promise<OAuthCachedSessionRestoreResult>;
 
   /** 显式校验当前 provider 会话：成功返回用户信息，失败或过期返回 null */
@@ -37,14 +34,8 @@ export interface IOAuthService {
    */
   startOAuth(provider: OAuthProviderId): Promise<OAuthStartResponse>;
 
-  /** 使用后端短期 flow 发起 OAuth；当前仅 Z.AI 支持，其他 provider 保持原流程。 */
-  startOAuthWithPolling(provider: OAuthProviderId): Promise<OAuthStartResponse>;
-
-  /** 查询当前后端 OAuth flow；未到查询时间、仍 pending 或没有 flow 时返回 null。 */
-  pollPendingOAuth(): Promise<OAuthCallbackResult | null>;
-
   /**
-   * 处理 OAuth 回调：校验 state；带 code 时换 token 并存凭据，只带归因参数时持久化归因信息
+   * 处理 OAuth 回调：校验 state，换 token 并存凭据。
    * 已接收回调因取消或新 flow 失效时返回 null，由调用方静默忽略。
    * @param url - 完整 deep link URL
    */

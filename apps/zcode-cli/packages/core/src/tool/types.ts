@@ -22,7 +22,6 @@ import type {
   ModelContentProtection,
   ModelMessageContent,
   ModelToolSideEffectScope,
-  OffPeakPort,
   TopicResourcePort,
   PdfDocumentPort,
   PermissionBrokerReasonSource,
@@ -92,8 +91,6 @@ export interface ToolMetadata {
     serverName: string;
     toolName: string;
     description?: string;
-    /** 来自声明 zcode_official 鉴权的 MCP server；仅用于信任其结果里的结构化标识。 */
-    official?: boolean;
     /** 该 server 所属插件的稳定 id（`${name}@${marketplace}`）；非插件 MCP 为空。 */
     pluginId?: string;
     /** 工具 `_meta` 归一化后的 MCP App 描述；存在即投影 display.ui（pluginId 缺省时用 serverName 顶替）。 */
@@ -141,8 +138,6 @@ export interface ToolExecutionContext {
   telemetry?: ToolExecutionSpanWriter;
   /** 当前工具调用是否属于 automation 派发轮；写工具 handler 用它做最终权限校验。 */
   automationTurn?: boolean;
-  /** 当前工具调用是否属于闲时任务派发轮；OffPeakCreate handler 用它做最终拒绝。 */
-  offPeakTurn?: boolean;
   traceContext?: TraceContext;
   traceId: TraceId;
   spanId?: string;
@@ -171,7 +166,6 @@ export interface ToolExecutionContext {
   workflowEscalatePort?: WorkflowEscalatePort;
   artifactStore?: ToolArtifactStorePort;
   automationPort?: AutomationPort;
-  offPeakPort?: OffPeakPort;
   topicResourcePort?: TopicResourcePort;
   sessionStore?: SessionStorePort;
   sessionModePort?: SessionModePort;

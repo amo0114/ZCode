@@ -8,20 +8,15 @@ import {
   ProviderConfigMap,
   ProviderConfigService,
   ProviderRegistryService,
-  ProviderSettingsFacade,
   ProviderTemplate,
   ProviderTemplateMap,
   extractManualModelConfig,
-  type AccountProviderConfigSnapshot,
   type PersonalProviderConfigRepository,
   type ProviderConfigLayerSnapshot,
   type ProviderConfigLayerUpdate,
   type ProviderSource,
 } from "../src/index.js";
-import {
-  createAccountProviderConfig,
-  createApiKeyProviderConfig,
-} from "./provider-config-fixtures.js";
+import { createApiKeyProviderConfig } from "./provider-config-fixtures.js";
 
 class MutableSource<TSnapshot> implements ProviderSource<TSnapshot> {
   readonly #listeners = new Set<(reason: string) => void>();
@@ -126,52 +121,6 @@ function manualModelConfig(): ModelConfig {
 }
 
 describe("ProviderConfigService", () => {
-  it.each(["zai", "bigmodel"] as const)(
-    "%s 账号所有模式拒绝新禁用，旧禁用不阻断普通保存",
-    async (accountType) => {
-      for (const mode of [
-        "start-plan",
-        "individual-coding-plan",
-        "team-coding-plan",
-        "off-peak",
-      ] as const) {
-        const personal = new MemoryPersonalRepository(
-          layerSnapshot(
-            "personal-1",
-            new ProviderConfigMap([
-              { providerId: "account", enabled: false, config: new ProviderConfig({}) },
-            ]),
-          ),
-        );
-        const service = new ProviderConfigService({
-          zcodeBuiltinSource: new MutableSource(
-            layerSnapshot(
-              "builtin-1",
-              new ProviderConfigMap([
-                ["account", createAccountProviderConfig({ accountType, mode })],
-              ]),
-            ),
-          ),
-          personalRepository: personal,
-        });
-        try {
-          const before = personal.current;
-          await expect(
-            service.savePersonalProviderOverlay("account", new ProviderConfig({}), undefined, {
-              enabled: false,
-            }),
-          ).rejects.toThrow(/Account Provider.*禁用/);
-          expect(personal.current).toBe(before);
-          await service.savePersonalProviderOverlay("account", new ProviderConfig({}), undefined, {
-            providerName: "renamed",
-          });
-          expect(personal.current.providers.getRule("account")?.providerName).toBe("renamed");
-        } finally {
-          service.dispose();
-        }
-      }
-    },
-  );
   it("Provider 外层启停经过保存和成员操作仍保留，不修改配置内容", async () => {
     const original = personalProvider(["A"]);
     const personal = new MemoryPersonalRepository(
@@ -334,193 +283,6 @@ describe("ProviderConfigService", () => {
     }
   });
 
-  it("动态账号成员的展示、编辑、排序共用快照，不复制成员且不允许重命名", async () => {
-    const builtin = new MutableSource(
-      layerSnapshot(
-        "builtin-1",
-        new ProviderConfigMap([
-          [
-            "account",
-            createAccountProviderConfig({
-              apiFormat: "anthropic-messages",
-              baseURL: "https://example.com",
-              models: ["STATIC"],
-            }),
-          ],
-        ]),
-        new ModelConfigRules([{ type: "model", modelMatch: ".*", config: completeModelConfig() }]),
-      ),
-    );
-    const personal = new MemoryPersonalRepository(layerSnapshot("personal-1"));
-    const service = new ProviderConfigService({
-      zcodeBuiltinSource: builtin,
-      personalRepository: personal,
-    });
-    const account = new MutableSource<AccountProviderConfigSnapshot>({
-      revision: "account-1",
-      basedOnZCodeBuiltinRevision: "builtin-1",
-      providers: new ProviderConfigMap([
-        [
-          "account",
-          createAccountProviderConfig({ models: ["glm-new", "glm-next"], entitled: true }),
-        ],
-      ]),
-    });
-    const registry = new ProviderRegistryService({ configSource: service, accountSource: account });
-    await registry.start();
-    const facade = new ProviderSettingsFacade(registry, {
-      createPersonalProvider: service.createPersonalProvider.bind(service),
-      savePersonalProviderOverlay: service.savePersonalProviderOverlay.bind(service),
-      deletePersonalProvider: service.deletePersonalProvider.bind(service),
-      reorderPersonalProviders: service.reorderPersonalProviders.bind(service),
-      reorderPersonalModels: service.reorderPersonalModels.bind(service),
-      addPersonalModel: service.addPersonalModel.bind(service),
-      renamePersonalModel: service.renamePersonalModel.bind(service),
-      deletePersonalModel: service.deletePersonalModel.bind(service),
-      savePersonalModelDraft: service.savePersonalModelDraft.bind(service),
-      setPersonalModelEnabled: service.setPersonalModelEnabled.bind(service),
-      refresh: registry.refresh.bind(registry),
-    });
-    try {
-      // 启停/编辑动态成员不创建根覆盖；随后仍必须能够首次添加个人模型。
-      await facade.setPersonalModelEnabled("account", "glm-new", false);
-      expect(personal.current.providers.has("account")).toBe(false);
-      await facade.addPersonalModel("account", "personal-first", {});
-      expect(personal.current.providers.get("account")?.personalModelIds).toEqual([
-        "personal-first",
-      ]);
-      await facade.deletePersonalModel("account", "personal-first");
-      await facade.savePersonalModelDraft({
-        providerId: "account",
-        originalModelId: "glm-new",
-        nextModelId: "glm-new",
-        personalConfig: { enabled: false },
-        basedOnRevision: facade.getView().revision,
-      });
-      await facade.reorderPersonalModels("account", ["glm-next", "glm-new"]);
-      // 模拟磁盘上遗留的账号禁用：设置投影和真实 Registry 必须读取同一公共结果。
-      await personal.update((current) => ({
-        ...current,
-        providers: current.providers.setRule({
-          ...current.providers.getRule("account")!,
-          enabled: false,
-        }),
-      }));
-      await registry.refresh();
-      const view = facade
-        .getView()
-        .providers.find((provider) => provider.providerId === "account")!;
-      expect(view.models.map((model) => model.modelId)).toEqual(["glm-next", "glm-new"]);
-      expect(view.enabled).toBe(true);
-      expect(view.executable).toBe(true);
-      expect(view.models.find((model) => model.modelId === "glm-new")?.enabled).toBe(false);
-      expect(personal.current.providers.get("account")?.personalModelIds).toEqual([]);
-      expect(personal.current.providers.get("account")?.builtinModelIds).toBeUndefined();
-      await facade.savePersonalProviderOverlay("account", {}, { providerName: "Account label" });
-      expect(
-        facade
-          .getView()
-          .providers.find((provider) => provider.providerId === "account")
-          ?.models.map((model) => model.modelId),
-      ).toEqual(["glm-next", "glm-new"]);
-      expect(personal.current.providers.get("account")?.modelOrder).toEqual([
-        "glm-next",
-        "glm-new",
-      ]);
-      await expect(
-        facade.savePersonalModelDraft({
-          providerId: "account",
-          originalModelId: "glm-new",
-          nextModelId: "renamed",
-          personalConfig: {},
-          basedOnRevision: facade.getView().revision,
-        }),
-      ).rejects.toThrow("不能重命名");
-      await expect(facade.addPersonalModel("account", "glm-next", {})).rejects.toThrow(
-        "Model 已存在",
-      );
-      await Promise.all([
-        facade.savePersonalModelDraft({
-          providerId: "account",
-          originalModelId: "glm-new",
-          nextModelId: "glm-new",
-          personalConfig: { properties: { requiresMfjsToolSchema: true }, enabled: false },
-          basedOnRevision: facade.getView().revision,
-        }),
-        facade.setPersonalModelEnabled("account", "glm-new", true),
-      ]);
-      expect(personal.current.models.getExact("account", "glm-new")?.toJSON()).toEqual({
-        properties: { requiresMfjsToolSchema: true },
-        enabled: true,
-      });
-      const beforeToggleRevision = facade.getView().revision;
-      const toggled = facade.setPersonalModelEnabled("account", "glm-new", false);
-      const staleDraft = facade.savePersonalModelDraft({
-        providerId: "account",
-        originalModelId: "glm-new",
-        nextModelId: "glm-new",
-        personalConfig: {},
-        basedOnRevision: beforeToggleRevision,
-      });
-      await Promise.all([toggled, expect(staleDraft).rejects.toThrow("revision conflict")]);
-      expect(personal.current.models.getExact("account", "glm-new")?.toJSON()).toEqual({
-        properties: { requiresMfjsToolSchema: true },
-        enabled: false,
-      });
-      const oldRevision = facade.getView().revision;
-      const beforeWrite = personal.current;
-      let entered!: () => void;
-      let release!: () => void;
-      const waiting = new Promise<void>((resolve) => {
-        entered = resolve;
-      });
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      const update = personal.update.bind(personal);
-      vi.spyOn(personal, "update").mockImplementationOnce(async (transform) => {
-        entered();
-        await gate;
-        return update(transform);
-      });
-      const queuedSave = facade.reorderPersonalModels("account", ["glm-new", "glm-next"]);
-      const rejectedSave = expect(queuedSave).rejects.toThrow("revision conflict");
-      await waiting;
-      account.current = {
-        ...account.current,
-        revision: "account-2",
-        providers: new ProviderConfigMap([
-          ["account", createAccountProviderConfig({ models: [], entitled: true })],
-        ]),
-      };
-      await registry.refresh("removed-members");
-      release();
-      await rejectedSave;
-      expect(personal.current).toBe(beforeWrite);
-      await expect(
-        facade.savePersonalModelDraft({
-          providerId: "account",
-          originalModelId: "glm-new",
-          nextModelId: "glm-new",
-          personalConfig: {},
-          basedOnRevision: oldRevision,
-        }),
-      ).rejects.toThrow("revision conflict");
-      await expect(
-        facade.savePersonalModelDraft({
-          providerId: "account",
-          originalModelId: "glm-new",
-          nextModelId: "glm-new",
-          personalConfig: {},
-          basedOnRevision: facade.getView().revision,
-        }),
-      ).rejects.toThrow("Model 不存在");
-    } finally {
-      registry.dispose();
-      service.dispose();
-    }
-  });
-
   it("把 ZCode Built-in Source 与 Personal Repository 聚合成 Registry Config Source", async () => {
     const zcodeBuiltin = new MutableSource(
       layerSnapshot(
@@ -670,37 +432,6 @@ describe("ProviderConfigService", () => {
       ),
     ).rejects.toThrow("尚未创建");
     expect(personal.current.providers.has("personal")).toBe(false);
-  });
-
-  it("固定 Account Provider 的 Personal Overlay 不能改写 Access", async () => {
-    const zcodeBuiltin = new MutableSource(
-      layerSnapshot(
-        "zcodeBuiltin-1",
-        new ProviderConfigMap([
-          {
-            providerId: "account:bigmodel-individual-coding-plan",
-            providerName: "BigModel",
-            config: createAccountProviderConfig({
-              accountType: "bigmodel",
-              mode: "individual-coding-plan",
-            }),
-          },
-        ]),
-      ),
-    );
-    const personal = new MemoryPersonalRepository(layerSnapshot("personal-1"));
-    const service = new ProviderConfigService({
-      zcodeBuiltinSource: zcodeBuiltin,
-      personalRepository: personal,
-    });
-
-    await expect(
-      service.savePersonalProviderOverlay(
-        "account:bigmodel-individual-coding-plan",
-        createApiKeyProviderConfig({ group: null, apiKey: "family-key" }),
-      ),
-    ).rejects.toThrow("固定 Account Provider 的 Access");
-    expect(personal.current.providers.has("account:bigmodel-individual-coding-plan")).toBe(false);
   });
 
   it("Provider label trim 后按大小写不敏感保持唯一", async () => {
@@ -1317,15 +1048,7 @@ describe("ProviderConfigService", () => {
       zcodeBuiltinSource: zcodeBuiltin,
       personalRepository: personal,
     });
-    const accountSource = new MutableSource<AccountProviderConfigSnapshot>({
-      revision: "account-1",
-      basedOnZCodeBuiltinRevision: "zcodeBuiltin-1",
-      providers: ProviderConfigMap.empty(),
-    });
-    const registry = new ProviderRegistryService({
-      configSource: configService,
-      accountSource,
-    });
+    const registry = new ProviderRegistryService({ configSource: configService });
     const changed = vi.fn();
     registry.onDidChange(changed);
     await registry.start();
@@ -1336,12 +1059,6 @@ describe("ProviderConfigService", () => {
       new ModelConfigRules([{ type: "model", modelMatch: ".*", config: completeModelConfig() }]),
     );
     zcodeBuiltin.emit("catalog-updated");
-    accountSource.current = {
-      revision: "account-2",
-      basedOnZCodeBuiltinRevision: "zcodeBuiltin-2",
-      providers: ProviderConfigMap.empty(),
-    };
-    accountSource.emit("builtin-recomputed");
 
     await vi.waitFor(() => expect(registry.getModel("local", "model-b")).toBeDefined());
     expect(changed).toHaveBeenCalledTimes(2);

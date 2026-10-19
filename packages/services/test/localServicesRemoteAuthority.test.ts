@@ -3,8 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ChannelClient, ChannelServer, createQueuePair } from "@zcode/rpc";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
-import { accountProviderCredentialKey } from "../src/model-provider/accountProviderCredentialKey.js";
 
 const originalHome = process.env.HOME;
 const tempHomes: string[] = [];
@@ -242,123 +240,9 @@ describe("createLocalServices remote authority", () => {
         },
       });
       await services.get(serviceDescriptors.ISettingService).update({ locale: "zh-CN" });
-      await services
-        .get(serviceDescriptors.ISettingService)
-        .update({ providerFamilyDomain: "zai" });
       await services.get(serviceDescriptors.ICredentialService).save("ssh:password", "ignored");
-      await services
-        .get(serviceDescriptors.ICredentialService)
-        .save("oauth:active_provider", "zai");
 
-      expect(onProviderProvisioningSourceChanged.mock.calls).toEqual([
-        ["personal-config"],
-        ["account-settings"],
-        ["credential"],
-      ]);
-    } finally {
-      disposeServiceResources(services);
-    }
-  });
-
-  it("keeps the narrow account request auth service private to the host process", async () => {
-    const home = makeTempHome();
-    process.env.HOME = home;
-    const fetchToken = vi.fn<typeof fetch>(async (input) => {
-      const url = String(input);
-      let data: unknown;
-      if (url.endsWith("/getCustomerInfo")) {
-        data = {
-          organizations: [{ organizationId: "org", projects: [{ projectId: "project" }] }],
-        };
-      } else if (url.endsWith("/api_keys")) {
-        data = [{ apiKey: "key-id", name: "zcode-api-key" }];
-      } else if (url.endsWith("/api_keys/key-id/access_tokens")) {
-        data = {
-          accessToken: "current-project-token",
-          tokenType: "Bearer",
-          expiresIn: 600,
-          expiresAt: Math.floor(Date.now() / 1000) + 600,
-        };
-      } else {
-        throw new Error(`Unexpected account request: ${url}`);
-      }
-      return new Response(JSON.stringify({ code: 200, data }), {
-        headers: { "content-type": "application/json" },
-      });
-    });
-    const {
-      createLocalServices,
-      disposeServiceResources,
-      getAccountRequestAuthService,
-      getOffPeakRequestAuthBuilder,
-    } = await import("../src/node.js");
-    const { ICredentialService, ISettingService } = await import("../src/index.js");
-    const services = createLocalServices({
-      zcodeBuiltinProviderConfigFilePath: writeZCodeBuiltinProviderConfig(home),
-      serviceAuthorityMode: "desktop-attached-remote",
-      hostApiNetworkTransport: {
-        fetch: fetchToken,
-        dispose: vi.fn(),
-        disposeAndWait: vi.fn(async () => {}),
-      },
-    });
-
-    try {
-      const accountRequestAuthService = getAccountRequestAuthService(services);
-      expect(accountRequestAuthService).toBeDefined();
-      expect(getOffPeakRequestAuthBuilder(services)).toBeTypeOf("function");
-      const { ProxyChannel } = await import("@zcode/rpc");
-      const exposeService = vi.spyOn(ProxyChannel, "fromService");
-      const registerChannel = vi.fn();
-      services.exposeOnChannelServer({ registerChannel });
-      expect(registerChannel).toHaveBeenCalled();
-      expect(exposeService).not.toHaveBeenCalledWith(accountRequestAuthService);
-      const credentialService = services.get(ICredentialService);
-      await services.get(ISettingService).update({
-        providerFamilyDomain: "zai",
-        providerFamilyConnectionSelections: {
-          zai: { kind: "individual-coding-plan" },
-        },
-      });
-      await credentialService.save(
-        "oauth:zai:user_info",
-        JSON.stringify({ id: "account-a", username: "a", displayName: "Account A" }),
-      );
-      await credentialService.save("oauth:zai:access_token", "login-token");
-      // OAuth 只用登录态换 PAT；保留旧 Key 作为反例，防止组装退回历史 Secret。
-      await credentialService.save(
-        accountProviderCredentialKey({
-          providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-          planKind: "individual-coding-plan",
-          accountIdentity: "account-a",
-        }),
-        "legacy-coding-plan-key",
-      );
-
-      await expect(
-        accountRequestAuthService!.resolveCurrent({
-          providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-          modelId: "glm-5",
-          accountAccess: {
-            type: "zhipu-account",
-            family: "zai",
-            planKind: "individual-coding-plan",
-          },
-          reason: "model-request",
-        }),
-      ).resolves.toEqual({
-        apiKey: "current-project-token",
-        apiKeyId: "key-id",
-        accountScope: expect.stringMatching(/^[a-f0-9]{64}$/),
-      });
-      const tokenRequest = fetchToken.mock.calls.find(([url]) =>
-        String(url).endsWith("/api_keys/key-id/access_tokens"),
-      );
-      expect(tokenRequest).toBeDefined();
-      expect(new Headers(tokenRequest![1]?.headers).get("authorization")).toBe(
-        "Bearer login-token",
-      );
-      expect(fetchToken.mock.calls.some(([url]) => String(url).includes("/copy/"))).toBe(false);
+      expect(onProviderProvisioningSourceChanged.mock.calls).toEqual([["personal-config"]]);
     } finally {
       disposeServiceResources(services);
     }

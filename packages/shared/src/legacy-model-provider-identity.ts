@@ -1,7 +1,4 @@
-import {
-  BUILTIN_MODEL_PROVIDER_IDS,
-  BUILTIN_PROVIDER_TEMPLATE_IDS,
-} from "./model-provider-types.js";
+import { BUILTIN_PROVIDER_TEMPLATE_IDS } from "./model-provider-types.js";
 import { normalizeOfficialGlmModelId } from "./official-glm-model-id.js";
 
 // 不凭用户自定义 Provider 的名字猜所属站点；闲时 Ticket 的绑定身份也不能改。
@@ -18,6 +15,7 @@ export function migrateLegacyOfficialGlmModelId(providerId: string, modelId: str
  * 依赖当前账号解释旧 Coding Plan 会使离线/SSH 迁移丢失原意图。
  * 同域 Individual 仅是确定性迁移落点，当前账号对应留给有效选择解析，不能据此绑定执行。
  * 迁移不查模型/档位是否可用；普通未知 ID 不构成旧格式证据。
+ * 账号型落点（account:*）已随智谱账号体系下线，但已持久化的迁移结果依赖这些固定值，必须保持不变。
  */
 export function migrateLegacyModelProviderId(providerId: string): string | undefined {
   switch (providerId) {
@@ -26,13 +24,13 @@ export function migrateLegacyModelProviderId(providerId: string): string | undef
     case "builtin:zai":
       return BUILTIN_PROVIDER_TEMPLATE_IDS.zai;
     case "builtin:bigmodel-start-plan":
-      return BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan;
+      return "account:bigmodel-start-plan";
     case "builtin:zai-start-plan":
-      return BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan;
+      return "account:zai-start-plan";
     case "builtin:bigmodel-coding-plan":
-      return BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan;
+      return "account:bigmodel-individual-coding-plan";
     case "builtin:zai-coding-plan":
-      return BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan;
+      return "account:zai-individual-coding-plan";
     default:
       return providerId.startsWith("builtin:") ? undefined : providerId;
   }

@@ -1,0 +1,89 @@
+name: Desktop E2E
+
+# 复用 scripts/test-desktop-e2e-container.sh，在 GitHub 托管的 x64 机器上跑容器 E2E。
+# 全量 spec 串行约 4–6 小时，超过单 job 6 小时上限，因此按 spec-duration-weights.json 分片到多个 job。
+# workflow_dispatch 只在工作流位于默认分支时可用；推送 e2e/** 分支可在不改动 main 的情况下跑全量。
+on:
+  push:
+    branches: ["e2e/**"]
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: "逗号分隔的 spec（相对 packages/desktop，如 ./test/e2e/smoke.test.ts）；留空则跑全部正式 spec"
+        required: false
+        default: ""
+      shards:
+        description: "全量模式下的分片数（指定 spec 时忽略）"
+        required: false
+        default: "6"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - id: plan
+        working-directory: packages/desktop
+        env:
+          INPUT_SPEC: ${{ inputs.spec || '' }}
+          INPUT_SHARDS: ${{ inputs.shards || '6' }}
+        run: |
+          node --input-type=module <<'EOF' >> "$GITHUB_OUTPUT"
+          import { readFileSync } from "node:fs";
+          import {
+            listDefaultFormalE2ESpecs,
+            partitionE2ESpecsByWeight,
+          } from "./scripts/run-windows-e2e-shards.mjs";
+
+          const requested = process.env.INPUT_SPEC.trim();
+          let shards;
+          if (requested) {
+            shards = [{ index: 1, specs: requested }];
+          } else {
+            const total = Number.parseInt(process.env.INPUT_SHARDS, 10);
+            if (!Number.isInteger(total) || total < 1) throw new Error(`invalid shards: ${process.env.INPUT_SHARDS}`);
+            const profile = JSON.parse(readFileSync("test/e2e/spec-duration-weights.json", "utf8"));
+            shards = partitionE2ESpecsByWeight(listDefaultFormalE2ESpecs(process.cwd()), total, profile)
+              .filter((bucket) => bucket.specs.length > 0)
+              .map((bucket, index) => ({ index: index + 1, specs: bucket.specs.join(",") }));
+          }
+          console.log(`matrix=${JSON.stringify({ include: shards })}`);
+          EOF
+
+  e2e:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: e2e (shard ${{ matrix.index }})
+    steps:
+      # 托管机器约 14G 可用磁盘，不够放 E2E 镜像；删掉用不到的预装工具链腾出空间。
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
+      - uses: actions/checkout@v4
+      - name: Run container E2E
+        env:
+          E2E_SPEC: ${{ matrix.specs }}
+          ZCODE_E2E_RUN_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.index }}
+        run: bash scripts/test-desktop-e2e-container.sh
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-shard-${{ matrix.index }}
+          path: packages/desktop/.e2e-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore

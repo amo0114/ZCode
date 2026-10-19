@@ -24,12 +24,6 @@ import {
   WEB_REMOTE_CONTROL_WORKSPACE_RECONNECT_TIMEOUT_MS,
   resolveWebRemoteControlRelayWsUrl,
 } from "@zcode/shared";
-import { WebCallbackPage } from "./auth/WebCallbackPage.js";
-import { WebLoggedInWaitingPage } from "./auth/WebLoggedInWaitingPage.js";
-import { WebLoginPage } from "./auth/WebLoginPage.js";
-import { createWebAuthService } from "./auth/webAuthService.js";
-import { WEB_ZAI_OAUTH_CONFIG, resolveWebAuthDevReturnTo } from "./auth/webZaiOAuthConfig.js";
-import { parseOAuthState, resolveSafeAppReturnTo } from "./auth/oauthStateCodec.js";
 import { resolveWebCommunityUrl, resolveWebHelpConfig } from "./communityUrl.js";
 import {
   ConversationShareLandingLoader,
@@ -65,7 +59,6 @@ import type {
   WebRemoteControlExternalWorkspaceBridge,
   RemoteTarget,
   ServerRemoteInfo,
-  UserInfo,
 } from "@zcode/shared";
 import {
   matchesWebRemoteControlRoutePath,
@@ -222,7 +215,6 @@ async function resolveFeedbackUrl(): Promise<string | undefined> {
 // 浏览器标签页 / 手机切后台时禁用 CSS 动画，避免 DocumentTimeline 持有已卸载的 DOM 子树。
 installDocumentHiddenMotionPause();
 const root = createRoot(document.getElementById("root")!);
-const webAuthService = createWebAuthService();
 let isPageUnloading = false;
 let isSwitchingWebRemoteControlWorkspace = false;
 
@@ -275,54 +267,6 @@ function renderWebRemoteControlFailure(failure: WebRemoteControlFailure): void {
   );
 }
 
-function isWebOAuthCallback(params: URLSearchParams): boolean {
-  return (
-    ["/web-remote/callback", "/cn/share/callback", "/share/callback"].includes(
-      window.location.pathname,
-    ) &&
-    params.has("state") &&
-    (params.has("code") || params.has("error"))
-  );
-}
-
-function isWebRemoteRoute(): boolean {
-  return window.location.pathname === "/web-remote" || window.location.pathname === "/web-remote/";
-}
-
-function shouldUseWebRemoteAuth(params: URLSearchParams): boolean {
-  void params;
-  return isWebRemoteRoute();
-}
-
-function resolveWebRemoteAppReturnTo(params: URLSearchParams): string {
-  if (isWebRemoteRoute() || !params.has("remoteControlToken")) {
-    return window.location.href;
-  }
-
-  const appReturnTo = new URL(window.location.href);
-  appReturnTo.pathname = "/web-remote";
-  return appReturnTo.toString();
-}
-
-function renderWebAuthCallbackPage(): void {
-  document.title = "ZCode - Web Remote Control Sign In";
-  const callbackState = parseOAuthState(
-    new URLSearchParams(window.location.search).get("state") ?? "",
-  );
-  const safeRetryTarget = resolveSafeAppReturnTo(callbackState?.app_return_to);
-  root.render(
-    <WebCallbackPage
-      authService={webAuthService}
-      onSuccess={({ appReturnTo }) => {
-        window.location.replace(appReturnTo ?? "/web-remote");
-      }}
-      onRetry={() => {
-        window.location.replace(safeRetryTarget ?? "/web-remote");
-      }}
-    />,
-  );
-}
-
 async function renderConversationSharePage(): Promise<void> {
   // 页面语言跟随路径前缀：/cn/share 中文，裸 /share 英文。
   const routeLocale = resolveConversationShareRouteLocale(window.location.pathname);
@@ -364,62 +308,17 @@ async function renderConversationSharePage(): Promise<void> {
       ? "mock-owner-token"
       : null;
   const onLogout = () => {
-    if (mockMode) {
-      window.sessionStorage.removeItem("zcode:share:mock-auth");
-      window.location.reload();
-      return;
-    }
-    void webAuthService.logout();
+    window.sessionStorage.removeItem("zcode:share:mock-auth");
+    window.location.reload();
   };
   root.render(
     <ConversationShareLandingLoader
       shareCode={shareCode}
       client={client}
-      getAccessToken={() => getMockToken() ?? webAuthService.getZCodeJwtToken()}
-      onLogin={(provider) => {
-        if (mockMode) {
-          window.sessionStorage.setItem("zcode:share:mock-auth", "owner");
-          window.location.reload();
-          return;
-        }
-        webAuthService.startLogin({
-          provider,
-          appReturnTo: window.location.href,
-          redirectUri: WEB_ZAI_OAUTH_CONFIG.shareRedirectUri,
-          devReturnTo: resolveWebAuthDevReturnTo(WEB_ZAI_OAUTH_CONFIG, "share"),
-        });
-      }}
-      onLogout={onLogout}
+      getAccessToken={getMockToken}
+      onLogout={mockMode ? onLogout : undefined}
       locale={routeLocale}
       theme={resolveWebThemePreference("zai-light")}
-    />,
-  );
-}
-
-function renderWebLoginPage(): void {
-  document.title = "ZCode - Web Remote Control Sign In";
-  root.render(
-    <WebLoginPage
-      onLogin={() => {
-        const params = new URLSearchParams(window.location.search);
-        webAuthService.startLogin({
-          devReturnTo: resolveWebAuthDevReturnTo(WEB_ZAI_OAUTH_CONFIG),
-          appReturnTo: resolveWebRemoteAppReturnTo(params),
-        });
-      }}
-    />,
-  );
-}
-
-function renderWebLoggedInWaitingPage(user: UserInfo): void {
-  document.title = "ZCode - Web Remote Control";
-  root.render(
-    <WebLoggedInWaitingPage
-      user={user}
-      onLogout={async () => {
-        await webAuthService.logout();
-        window.location.replace("/web-remote");
-      }}
     />,
   );
 }
@@ -1240,7 +1139,6 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
     oauthService: createEmptyHomeOnlyService<RootServices["oauthService"]>({
       getProviders: async () => [],
       getActiveProvider: async () => null,
-      restoreCachedSession: async () => null,
       restoreCachedSessionState: async () => ({ status: "signed-out" }),
       restoreSession: async () => null,
       refreshToken: async () => {},
@@ -1260,9 +1158,6 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
     }),
     usageStatsService:
       createUnsupportedHomeOnlyService<RootServices["usageStatsService"]>("usageStatsService"),
-    codingPlanSubscriptionService: createUnsupportedHomeOnlyService<
-      RootServices["codingPlanSubscriptionService"]
-    >("codingPlanSubscriptionService"),
     clientConfigService: createEmptyHomeOnlyService<RootServices["clientConfigService"]>({
       getSnapshot: async () => ({ pluginStoreOrder: null, zsrcUrl: null }),
     }),
@@ -1271,12 +1166,6 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
       list: async () => ({ code: 0, msg: "", data: [] }),
     }),
     // 闲时任务仅桌面本地（D13）；web home-only 环境按不支持处理。
-    offPeakTaskService:
-      createUnsupportedHomeOnlyService<RootServices["offPeakTaskService"]>("offPeakTaskService"),
-    highspeedCardService:
-      createUnsupportedHomeOnlyService<RootServices["highspeedCardService"]>(
-        "highspeedCardService",
-      ),
     skillsService: createEmptyHomeOnlyService<RootServices["skillsService"]>({
       list: async () => ({
         skills: [],
@@ -2419,11 +2308,6 @@ async function bootstrapWebRemoteControlByToken(params: URLSearchParams): Promis
 
 async function bootstrapWebApp() {
   const params = new URLSearchParams(window.location.search);
-  if (isWebOAuthCallback(params)) {
-    renderWebAuthCallbackPage();
-    return;
-  }
-
   if (isConversationSharePath(window.location.pathname)) {
     await renderConversationSharePage();
     return;
@@ -2447,17 +2331,6 @@ async function bootstrapWebApp() {
             ),
       );
     }
-    return;
-  }
-
-  if (shouldUseWebRemoteAuth(params)) {
-    const auth = await webAuthService.restoreCachedSession();
-    if (!auth) {
-      renderWebLoginPage();
-      return;
-    }
-
-    renderWebLoggedInWaitingPage(auth);
     return;
   }
 

@@ -649,26 +649,21 @@ describe("hostResponseMessageSchema", () => {
     });
   });
 
-  it("accepts provider family domain settings and defaults migration marker to false", () => {
-    const defaults = appSettingsSchema.parse({});
-    const parsed = appSettingsSchema.parse({
+  it("strips retired provider family settings from old setting files", () => {
+    const retired = {
       providerFamilyDomain: "zai",
       providerFamilyDomainUpdatedAt: 123,
       providerFamilyDomainMigrated: true,
-    });
-    const patch = appSettingsPatchSchema.parse({
-      providerFamilyDomain: "",
-      providerFamilyDomainUpdatedAt: 456,
-      providerFamilyDomainMigrated: true,
-    });
+      providerFamilyConnectionSelections: { zai: { kind: "individual-coding-plan" } },
+      startPlanRecommendationDismissed: true,
+    };
+    const parsed = appSettingsSchema.parse(retired);
+    const patch = appSettingsPatchSchema.parse(retired);
 
-    expect(defaults.providerFamilyDomain).toBeUndefined();
-    expect(defaults.providerFamilyDomainMigrated).toBe(false);
-    expect(parsed.providerFamilyDomain).toBe("zai");
-    expect(parsed.providerFamilyDomainUpdatedAt).toBe(123);
-    expect(parsed.providerFamilyDomainMigrated).toBe(true);
-    expect(patch.providerFamilyDomain).toBe("");
-    expect(patch.providerFamilyDomainUpdatedAt).toBe(456);
+    for (const key of Object.keys(retired)) {
+      expect(parsed).not.toHaveProperty(key);
+      expect(patch).not.toHaveProperty(key);
+    }
   });
 
   it("normalizes legacy enabled agent CLI providers to ZCode Agent", () => {

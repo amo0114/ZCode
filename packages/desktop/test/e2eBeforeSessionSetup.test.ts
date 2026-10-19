@@ -30,17 +30,11 @@ describe("desktop e2e beforeSession setup", () => {
         events.push("coding-plan-team");
       },
       configureCodingPlanTeamMockForSpecs,
-      startCodingPlanUpgradeMockIfNeeded: async () => {
-        events.push("coding-plan-upgrade");
-      },
       startUpstreamHttpIfNeeded: async () => {
         events.push("upstream-http");
       },
       startPluginCdnZipFixtureIfNeeded: async () => {
         events.push("plugin-cdn");
-      },
-      startOffPeakMockIfNeeded: async () => {
-        events.push("off-peak-mock");
       },
     }).then(() => {
       events.push("setup-resolved");
@@ -54,9 +48,7 @@ describe("desktop e2e beforeSession setup", () => {
       "coding-plan-team",
       "coding-plan-case-mode",
       "upstream-http",
-      "coding-plan-upgrade",
       "plugin-cdn",
-      "off-peak-mock",
       "reset-started",
     ]);
     expect(configureCodingPlanTeamMockForSpecs).toHaveBeenCalledWith([

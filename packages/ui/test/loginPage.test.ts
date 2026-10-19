@@ -48,26 +48,10 @@ vi.mock("@/store/StoreProvider.js", () => ({
       user: null,
       oauthError: null,
       setOAuthError: vi.fn(),
-      oauthSuccessSeq: 0,
-      lastOAuthSuccessProvider: null,
-      loginEntryRequest: null,
-      loginEntryAttempt: null,
-      clearLoginEntryRequest: vi.fn(),
-      markLoginEntryAttemptStatus: vi.fn(),
     }),
 }));
 
 describe("WelcomeScreen", () => {
-  it("已有用户不会完成新发起的 Provider 登录尝试", async () => {
-    const { shouldCompleteLoginFromExistingUser, shouldCompleteProviderLoginAttempt } =
-      await import("@/WelcomeScreen.js");
-    const attempt = { id: 9, providerId: "bigmodel" as const };
-
-    expect(shouldCompleteLoginFromExistingUser({ hasUser: true, attempt })).toBe(false);
-    expect(shouldCompleteProviderLoginAttempt({ attempt, successProvider: "zai" })).toBe(false);
-    expect(shouldCompleteProviderLoginAttempt({ attempt, successProvider: "bigmodel" })).toBe(true);
-  });
-
   it("使用项目选择页主题大背景和 background 登录面板", async () => {
     oauthState.status = "idle";
     oauthState.error = null;
@@ -102,25 +86,30 @@ describe("WelcomeScreen", () => {
     expect(html).not.toContain("bg-destructive text-destructive-foreground");
   });
 
-  it("地域标签使用登录按钮前景色弱强调样式", async () => {
+  it("零登录渠道时只保留 API Key 入口，不渲染登录按钮或无渠道告警（I7）", async () => {
     oauthState.status = "idle";
     oauthState.error = null;
     oauthState.loadingProviders = false;
-    oauthState.providers = [
-      {
-        id: "zai",
-        displayName: "Z.AI",
-        enabled: true,
-        order: 0,
-      },
-    ];
+    oauthState.providers = [];
 
     const { WelcomeScreen } = await import("@/WelcomeScreen.js");
     const html = renderToStaticMarkup(createElement(WelcomeScreen, { onComplete: vi.fn() }));
 
-    expect(html).toContain("border-primary-foreground/30");
-    expect(html).toContain("text-primary-foreground/60");
-    expect(html).not.toContain("bg-primary-foreground/10");
-    expect(html).not.toContain("button-gradient");
+    expect(html).toContain("login.useApiKey");
+    expect(html).not.toContain("login.oauth.button");
+    expect(html).not.toContain("login.oauth.noProviders");
+  });
+
+  it("有注册渠道时按 getProviders() 渲染通用登录按钮", async () => {
+    oauthState.status = "idle";
+    oauthState.error = null;
+    oauthState.loadingProviders = false;
+    oauthState.providers = [{ id: "mock", displayName: "Mock", enabled: true, order: 0 }];
+
+    const { WelcomeScreen } = await import("@/WelcomeScreen.js");
+    const html = renderToStaticMarkup(createElement(WelcomeScreen, { onComplete: vi.fn() }));
+
+    expect(html).toContain("login.oauth.button");
+    expect(html).toContain("oauth-login-button");
   });
 });

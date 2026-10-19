@@ -7,7 +7,6 @@ describe("Provisioning 安全错误码契约", () => {
       syncId: "fixture",
       status: "failed",
       personalProviderCount: 0,
-      credentialCount: 0,
       rolledBack: true,
       ...(errorCode ? { errorCode } : {}),
     };

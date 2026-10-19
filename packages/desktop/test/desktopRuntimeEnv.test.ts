@@ -58,12 +58,6 @@ vi.mock("@zcode/shared", () => ({
   TEST_ZCODE_ENDPOINT_ORIGIN: "https://zcode.z.ai",
   resolveRuntimeZCodeEndpointOrigin: (env: Record<string, string | undefined>) =>
     env.ZCODE_BASE_URL ?? env.ZCODE_TEST_BASE_URL ?? "https://zcode.z.ai",
-  resolveZaiOAuthOrigin: (env: Record<string, string | undefined>) =>
-    env.ZAI_OAUTH_ORIGIN ?? env.ZAI_TEST_OAUTH_ORIGIN ?? "https://chat.z.ai",
-  resolveZaiBusinessBaseUrl: (env: Record<string, string | undefined>) =>
-    env.ZAI_BUSINESS_BASE_URL ?? env.ZAI_TEST_BUSINESS_BASE_URL ?? "https://api.z.ai",
-  resolveZaiOAuthClientId: (env: Record<string, string | undefined>) =>
-    env.ZAI_OAUTH_CLIENT_ID ?? env.ZAI_TEST_OAUTH_CLIENT_ID ?? "client_P8X5CMWmlaRO9gyO-KSqtg",
   sanitizeZCodeRuntimeEnv: (env: Record<string, string | undefined>) => {
     const sanitizedKeys = new Set([
       "NODE_ENV",
@@ -159,9 +153,6 @@ const originalGlmBinaryPath = process.env["GLM_BINARY_PATH"];
 const originalZCodeBaseUrl = process.env["ZCODE_BASE_URL"];
 const originalZCodeEndpointOrigin = process.env["ZCODE_ENDPOINT_ORIGIN"];
 const originalDynamicWorkflowMode = process.env["ZCODE_DYNAMIC_WORKFLOW_MODE"];
-const originalZaiOAuthOrigin = process.env["ZAI_OAUTH_ORIGIN"];
-const originalZaiBusinessBaseUrl = process.env["ZAI_BUSINESS_BASE_URL"];
-const originalZaiOAuthClientId = process.env["ZAI_OAUTH_CLIENT_ID"];
 const originalDesktopApplicationName = process.env["ZCODE_DESKTOP_APPLICATION_NAME"];
 const originalDesktopHomeDir = process.env["ZCODE_DESKTOP_HOME_DIR"];
 const originalDesktopUserDataDir = process.env["ZCODE_DESKTOP_USER_DATA_DIR"];
@@ -452,9 +443,6 @@ describe("desktopRuntimeEnv buildHostProcessEnv", () => {
     }
     restoreEnvValue("ZCODE_BASE_URL", originalZCodeBaseUrl);
     restoreEnvValue("ZCODE_ENDPOINT_ORIGIN", originalZCodeEndpointOrigin);
-    restoreEnvValue("ZAI_OAUTH_ORIGIN", originalZaiOAuthOrigin);
-    restoreEnvValue("ZAI_BUSINESS_BASE_URL", originalZaiBusinessBaseUrl);
-    restoreEnvValue("ZAI_OAUTH_CLIENT_ID", originalZaiOAuthClientId);
     if (originalResourcesPathDescriptor) {
       Object.defineProperty(process, "resourcesPath", originalResourcesPathDescriptor);
     } else {
@@ -747,15 +735,12 @@ describe("desktopRuntimeEnv buildHostProcessEnv", () => {
     expectRuntimePath(env.GLM_BINARY_PATH, bundledPath);
   });
 
-  it("本地 host 进程加载工作区 .env.development 的测试环境 API 与 ZAI 登录入口", async () => {
+  it("本地 host 进程加载工作区 .env.development 的测试环境 API", async () => {
     const { loadHostProcessEnvFromLocalFiles } = await import("../src/main/desktopRuntimeEnv.js");
 
     const env = loadHostProcessEnvFromLocalFiles();
 
     expect(env.ZCODE_BASE_URL).toBe("https://zcode.z.ai");
-    expect(env.ZAI_OAUTH_ORIGIN).toBe("https://chat.z.ai");
-    expect(env.ZAI_BUSINESS_BASE_URL).toBe("https://api.z.ai");
-    expect(env.ZAI_OAUTH_CLIENT_ID).toBe("client_P8X5CMWmlaRO9gyO-KSqtg");
   });
 
   it("main 进程 endpoint 临时覆盖优先读取命令行环境变量", async () => {
@@ -769,7 +754,7 @@ describe("desktopRuntimeEnv buildHostProcessEnv", () => {
     ).toBe("http://127.0.0.1:18765");
   });
 
-  it("打包后的测试环境 host 进程应内置测试环境登录入口", async () => {
+  it("打包后的测试环境 host 进程应内置测试环境 API 链接", async () => {
     appMock.isPackaged = true;
     Object.defineProperty(process, "resourcesPath", {
       value: "/mock/resources",
@@ -777,9 +762,6 @@ describe("desktopRuntimeEnv buildHostProcessEnv", () => {
     });
     delete process.env["ZCODE_BASE_URL"];
     delete process.env["ZCODE_ENDPOINT_ORIGIN"];
-    delete process.env["ZAI_OAUTH_ORIGIN"];
-    delete process.env["ZAI_BUSINESS_BASE_URL"];
-    delete process.env["ZAI_OAUTH_CLIENT_ID"];
 
     const { buildHostProcessEnv, loadHostProcessEnvFromLocalFiles } =
       await import("../src/main/desktopRuntimeEnv.js");
@@ -788,9 +770,6 @@ describe("desktopRuntimeEnv buildHostProcessEnv", () => {
 
     expect(env.ZCODE_ENV).toBe("test");
     expect(env.ZCODE_BASE_URL).toBe("https://zcode.z.ai");
-    expect(env.ZAI_OAUTH_ORIGIN).toBe("https://chat.z.ai");
-    expect(env.ZAI_BUSINESS_BASE_URL).toBe("https://api.z.ai");
-    expect(env.ZAI_OAUTH_CLIENT_ID).toBe("client_P8X5CMWmlaRO9gyO-KSqtg");
     expect(env.ZCODE_CUA_HELPER_INSTALL_VARIANT).toBe("preview");
   });
 

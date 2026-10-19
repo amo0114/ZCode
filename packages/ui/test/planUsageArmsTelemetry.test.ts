@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_MODEL_PROVIDER_IDS, type ArmsCustomEventPayload } from "@zcode/shared";
+import type { ArmsCustomEventPayload } from "@zcode/shared";
 import {
   PLAN_USAGE_ARMS_EVENT_TTFT,
   PLAN_USAGE_ARMS_EVENT_REQUEST,
@@ -51,7 +51,7 @@ describe("planUsageArmsTelemetry", () => {
     const reporter = makeReporter();
 
     reportPlanUsageRequestToArms(reporter, {
-      providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
+      providerId: "builtin:zai",
       modelName: "GLM-5.2",
       askMode: "code",
       requestStatus: "queued",
@@ -66,7 +66,7 @@ describe("planUsageArmsTelemetry", () => {
         ask_mode: "code",
         // 内置 provider 保留稳定 ID；白名单匹配与输出统一使用规范化小写模型 ID。
         model_name: "glm-5.2",
-        provider_id: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
+        provider_id: "builtin:zai",
         provider_scope: "builtin",
         request_status: "queued",
       },
@@ -77,7 +77,7 @@ describe("planUsageArmsTelemetry", () => {
     const reporter = makeReporter();
 
     reportPlanUsageTtftToArms(reporter, {
-      providerId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
+      providerId: "builtin:bigmodel",
       modelName: "GLM-5.1",
       askMode: "code",
       ttftMs: 1234.4,
@@ -91,7 +91,7 @@ describe("planUsageArmsTelemetry", () => {
       properties: {
         ask_mode: "code",
         model_name: "glm-5.1",
-        provider_id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
+        provider_id: "builtin:bigmodel",
         provider_scope: "builtin",
         ttft_ms: 1234,
       },
@@ -127,7 +127,7 @@ describe("planUsageArmsTelemetry", () => {
     const reporter = makeReporter();
 
     reportPlanUsageTtftToArms(reporter, {
-      providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
+      providerId: "builtin:zai",
       ttftMs: -1,
     });
 
@@ -143,7 +143,7 @@ describe("planUsageArmsTelemetry", () => {
 
     expect(() =>
       reportPlanUsageRequestToArms(reporter, {
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
+        providerId: "builtin:bigmodel",
       }),
     ).not.toThrow();
   });

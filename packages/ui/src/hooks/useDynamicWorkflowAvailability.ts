@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import type { ICodingPlanSubscriptionService, IZCodeAgentService } from "@zcode/services";
+import type { IZCodeAgentService } from "@zcode/services";
 import type { DynamicWorkflowMode } from "@zcode/shared";
 import { logger } from "@/logger.js";
 import {
@@ -25,7 +25,7 @@ export function useDynamicWorkflowAvailability(): DynamicWorkflowAvailabilitySna
  * 取数与失败重试的规则见 dynamicWorkflowAvailabilityStore。
  */
 export function useDynamicWorkflowAvailabilityLoader(
-  service: ICodingPlanSubscriptionService,
+  service: Pick<IZCodeAgentService, "getDynamicWorkflowClientConfig">,
 ): void {
   const ensureLoaded = useDynamicWorkflowAvailabilityStore((state) => state.ensureLoaded);
   useEffect(() => {
@@ -44,10 +44,12 @@ export function useDynamicWorkflowAvailabilityLoader(
 export function useDynamicWorkflowUserModeSync(params: {
   settingsLoaded: boolean;
   userMode: DynamicWorkflowMode | undefined;
-  zcodeAgentService: Pick<IZCodeAgentService, "syncDynamicWorkflowUserMode">;
-  codingPlanSubscriptionService: ICodingPlanSubscriptionService;
+  zcodeAgentService: Pick<
+    IZCodeAgentService,
+    "syncDynamicWorkflowUserMode" | "getDynamicWorkflowClientConfig"
+  >;
 }): void {
-  const { settingsLoaded, userMode, zcodeAgentService, codingPlanSubscriptionService } = params;
+  const { settingsLoaded, userMode, zcodeAgentService } = params;
   const reload = useDynamicWorkflowAvailabilityStore((state) => state.reload);
   const observedRef = useRef<{ userMode: DynamicWorkflowMode | undefined } | null>(null);
   const chainRef = useRef<Promise<void>>(Promise.resolve());
@@ -64,7 +66,7 @@ export function useDynamicWorkflowUserModeSync(params: {
           error: error instanceof Error ? error.message : String(error),
         });
       }
-      await reload(codingPlanSubscriptionService);
+      await reload(zcodeAgentService);
     });
-  }, [codingPlanSubscriptionService, reload, settingsLoaded, userMode, zcodeAgentService]);
+  }, [reload, settingsLoaded, userMode, zcodeAgentService]);
 }

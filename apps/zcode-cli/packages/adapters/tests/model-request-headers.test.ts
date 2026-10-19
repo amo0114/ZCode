@@ -19,7 +19,7 @@ describe("模型 Header 合并与绑定边界", () => {
     expect(personal.authorization).toBe("old");
   });
 
-  it("绑定后默认值/Provider 修改不影响旧 Model，鉴权只覆盖本次请求", async () => {
+  it("绑定后默认值/Provider 修改不影响旧 Model", async () => {
     const defaults = { "X-Title": "Z Code@electron", "X-ZCode-App-Version": "3.12.0" };
     const requests: Request[] = [];
     const execution = new AiSdkModelExecution(
@@ -65,29 +65,16 @@ describe("模型 Header 合并与绑定边界", () => {
     defaults["X-ZCode-App-Version"] = "changed";
     const next = bind("New Personal");
     const options = { reasoningLevel: "disabled", maxOutputTokens: 1024 };
-    const resolved = [
-      old.resolveRequest({
-        options,
-        requestAuth: { apiKey: "fresh-key", headers: { "X-Once": "fresh" } },
-      }),
-      old.resolveRequest({ options }),
-      next.resolveRequest({ options }),
-    ];
+    const resolved = [old.resolveRequest({ options }), next.resolveRequest({ options })];
     for (const model of resolved)
       await generateText({ model: model.model, prompt: "hello", maxRetries: 0 });
-    expect(requests.map((r) => r.headers.get("x-title"))).toEqual([
-      "Personal",
-      "Personal",
-      "New Personal",
-    ]);
+    expect(requests.map((r) => r.headers.get("x-title"))).toEqual(["Personal", "New Personal"]);
     expect(requests.map((r) => r.headers.get("x-zcode-app-version"))).toEqual([
       "3.12.0",
       "3.12.0",
-      "3.12.0",
     ]);
-    expect(requests.map((r) => r.headers.get("x-once"))).toEqual(["fresh", "stale", "stale"]);
+    expect(requests.map((r) => r.headers.get("x-once"))).toEqual(["stale", "stale"]);
     expect(requests.map((r) => r.headers.get("authorization"))).toEqual([
-      "Bearer fresh-key",
       "Bearer key",
       "Bearer key",
     ]);

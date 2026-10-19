@@ -2,7 +2,6 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  BIGMODEL_PROVIDER_ID,
   CREDENTIAL_DECRYPT_ERROR_CODE,
   type OAuthProviderId,
   type OAuthProviderMeta,
@@ -20,14 +19,12 @@ const mocks = vi.hoisted(() => ({
     getActiveProvider: vi.fn<() => Promise<OAuthProviderId | null>>(),
     getProviders: vi.fn<() => Promise<OAuthProviderMeta[]>>(),
     startOAuth: vi.fn(),
-    startOAuthWithPolling: vi.fn(),
   },
   platform: {
     openExternal: vi.fn(),
     registerOAuthState: vi.fn(),
   },
   reportAppTelemetryEvent: vi.fn(async () => {}),
-  setOAuthPollingActive: vi.fn(),
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
@@ -38,12 +35,6 @@ vi.mock("@/hooks/useServices.js", () => ({
 
 vi.mock("@/hooks/usePlatform.js", () => ({
   usePlatform: () => mocks.platform,
-}));
-
-vi.mock("@/store/StoreProvider.js", () => ({
-  useZCodeStore: (
-    selector: (state: { setOAuthPollingActive: typeof mocks.setOAuthPollingActive }) => unknown,
-  ) => selector({ setOAuthPollingActive: mocks.setOAuthPollingActive }),
 }));
 
 vi.mock("@/i18n/IntlProvider.js", () => ({
@@ -155,11 +146,9 @@ describe("useOAuth", () => {
     mocks.oauthService.getActiveProvider.mockReset();
     mocks.oauthService.getProviders.mockReset();
     mocks.oauthService.startOAuth.mockReset();
-    mocks.oauthService.startOAuthWithPolling.mockReset();
     mocks.platform.openExternal.mockClear();
     mocks.platform.registerOAuthState.mockClear();
     mocks.reportAppTelemetryEvent.mockClear();
-    mocks.setOAuthPollingActive.mockClear();
   });
 
   afterEach(() => {
@@ -170,8 +159,8 @@ describe("useOAuth", () => {
 
   it("keeps provider list visible when active provider credential cannot be decrypted", async () => {
     const provider: OAuthProviderMeta = {
-      id: BIGMODEL_PROVIDER_ID,
-      displayName: "BigModel",
+      id: "mock",
+      displayName: "Mock",
       enabled: true,
       order: 0,
     };
@@ -210,8 +199,8 @@ describe("useOAuth", () => {
 
   it("does not hide non-credential active provider failures as logged-out state", async () => {
     const provider: OAuthProviderMeta = {
-      id: BIGMODEL_PROVIDER_ID,
-      displayName: "BigModel",
+      id: "mock",
+      displayName: "Mock",
       enabled: true,
       order: 0,
     };
@@ -243,18 +232,19 @@ describe("useOAuth", () => {
     });
   });
 
-  it("starts login through the backend polling flow", async () => {
+  it("starts login through the redirect flow", async () => {
     const root: Root = createRoot(installMinimalDom());
     let startLogin: ReturnType<typeof useOAuth>["startLogin"] | undefined;
     function OAuthActionProbe() {
       startLogin = useOAuth().startLogin;
       return createElement("span");
     }
+    const provider = "mock" as OAuthProviderId;
     mocks.oauthService.getProviders.mockResolvedValue([]);
     mocks.oauthService.getActiveProvider.mockResolvedValue(null);
-    mocks.oauthService.startOAuthWithPolling.mockResolvedValue({
-      authorizeUrl: "https://chat.z.ai/api/oauth/authorize?state=flow-state",
-      provider: "zai",
+    mocks.oauthService.startOAuth.mockResolvedValue({
+      authorizeUrl: "https://auth.example.com/oauth/authorize?state=flow-state",
+      provider,
       state: "flow-state",
     });
 
@@ -262,54 +252,22 @@ describe("useOAuth", () => {
       root.render(createElement(OAuthActionProbe));
     });
     await act(async () => {
-      await startLogin?.("zai");
+      await startLogin?.(provider);
     });
 
-    expect(mocks.oauthService.startOAuthWithPolling).toHaveBeenCalledWith("zai");
-    expect(mocks.oauthService.startOAuth).not.toHaveBeenCalled();
+    expect(mocks.oauthService.startOAuth).toHaveBeenCalledWith(provider);
     expect(mocks.platform.registerOAuthState).toHaveBeenCalledWith({
-      provider: "zai",
+      provider,
       state: "flow-state",
     });
     expect(mocks.platform.openExternal).toHaveBeenCalledWith(
-      "https://chat.z.ai/api/oauth/authorize?state=flow-state",
+      "https://auth.example.com/oauth/authorize?state=flow-state",
     );
-    expect(mocks.setOAuthPollingActive).toHaveBeenCalledWith(true);
     expect(mocks.reportAppTelemetryEvent).toHaveBeenCalledWith(
       mocks.platform,
-      expect.objectContaining({ eventExtraDetail: { login_url: "chat.z.ai" } }),
+      expect.objectContaining({ eventExtraDetail: { login_url: "auth.example.com" } }),
       "useOAuth",
     );
-
-    act(() => {
-      root.unmount();
-    });
-  });
-
-  it("does not start Root polling for a custom deep-link provider", async () => {
-    const root: Root = createRoot(installMinimalDom());
-    let startLogin: ReturnType<typeof useOAuth>["startLogin"] | undefined;
-    function OAuthActionProbe() {
-      startLogin = useOAuth().startLogin;
-      return createElement("span");
-    }
-    const customProvider = "custom-oauth" as OAuthProviderId;
-    mocks.oauthService.getProviders.mockResolvedValue([]);
-    mocks.oauthService.getActiveProvider.mockResolvedValue(null);
-    mocks.oauthService.startOAuthWithPolling.mockResolvedValue({
-      authorizeUrl: "https://example.com/oauth?state=custom-state",
-      provider: customProvider,
-      state: "custom-state",
-    });
-
-    await act(async () => {
-      root.render(createElement(OAuthActionProbe));
-    });
-    await act(async () => {
-      await startLogin?.(customProvider);
-    });
-
-    expect(mocks.setOAuthPollingActive).toHaveBeenCalledWith(false);
 
     act(() => {
       root.unmount();

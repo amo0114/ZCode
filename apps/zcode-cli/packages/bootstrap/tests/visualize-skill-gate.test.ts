@@ -129,9 +129,7 @@ describe("visualize protocol-only skill discovery", () => {
       sessions: new Map(),
     } as unknown as ZCodeProtocolAgentServerContext;
     const workspace = { workspacePath: root, workspaceKey: root };
-    await createWorkspaceZCodeApp(context, workspace, {
-      providerRuntimeHeadersPort: {} as ZCodeAppOptions["providerRuntimeHeadersPort"],
-    });
+    await createWorkspaceZCodeApp(context, workspace, {});
     expect(createZCodeApp).toHaveBeenCalledWith(
       expect.objectContaining({ includeVisualize: true }),
     );

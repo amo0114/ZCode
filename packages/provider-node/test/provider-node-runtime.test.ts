@@ -152,16 +152,6 @@ describe("@zcode/provider-node", () => {
       supportsMidConversationSystem: true,
       supportsNativeWebSearch: false,
     });
-    expect(snapshot.providers.get("account:zai-start-plan")?.access).toMatchObject({
-      type: "zhipu-account",
-      accountType: "zai",
-      mode: "start-plan",
-    });
-    expect(snapshot.providers.get("account:zai-offpeak-idle-plan")?.access).toMatchObject({
-      type: "zhipu-account",
-      accountType: "zai",
-      mode: "off-peak",
-    });
     expect(snapshot.providerTemplates?.get("deepseek")?.config.access).toMatchObject({
       type: "api-key",
     });
@@ -193,12 +183,8 @@ describe("@zcode/provider-node", () => {
             {
               providerId: "zcodeBuiltin",
               config: {
-                group: "zai-family",
-                access: {
-                  type: "zhipu-account",
-                  accountType: "zai",
-                  mode: "start-plan",
-                },
+                group: "standard-personal",
+                access: { type: "api-key" },
                 builtinModelIds: [],
               },
             },
@@ -661,12 +647,8 @@ async function writeZCodeBuiltin(filePath: string, modelId: string): Promise<voi
             {
               providerId: "zcodeBuiltin",
               config: {
-                group: "zai-family",
-                access: {
-                  type: "zhipu-account",
-                  accountType: "zai",
-                  mode: "start-plan",
-                },
+                group: "standard-personal",
+                access: { type: "api-key" },
                 builtinModelIds: [modelId],
               },
             },

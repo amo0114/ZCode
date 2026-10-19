@@ -82,7 +82,6 @@ export function ProviderCardHeader({
   onNameCompositionStart,
   onStartEditName,
   onDelete,
-  actionsVisible = true,
   providerToggle,
 }: {
   providerName: string;
@@ -98,12 +97,11 @@ export function ProviderCardHeader({
   onNameCompositionStart?: () => void;
   onStartEditName: () => void;
   onDelete?: () => void;
-  actionsVisible?: boolean;
   providerToggle?: ReactNode;
 }) {
   const { intl } = useZCodeIntl();
   const renameRequestedRef = useRef(false);
-  const secondaryActionsVisible = actionsVisible && (nameEditable || Boolean(onDelete));
+  const secondaryActionsVisible = nameEditable || Boolean(onDelete);
 
   return (
     <div className="flex items-center justify-between gap-3" data-testid="model-provider-header">
@@ -354,7 +352,6 @@ export function ProviderModelsSection({
   providerId,
   providerName,
   providerEnabled = true,
-  providerAccess,
   models,
   onTestModel,
   onModelCommit,
@@ -367,7 +364,6 @@ export function ProviderModelsSection({
   providerId: string;
   providerName?: string;
   providerEnabled?: boolean;
-  providerAccess?: ProviderConfigObject["access"];
   models: ProviderSettingsFormModel[];
   onTestModel?: (model: string) => Promise<ModelConnectivityResult>;
   onModelCommit: (
@@ -514,7 +510,6 @@ export function ProviderModelsSection({
                     providerId={providerId}
                     providerName={providerName}
                     providerEnabled={providerEnabled}
-                    providerAccess={providerAccess}
                     inputTestId={testId(TID_MODEL_PROVIDER_MODEL_INPUT, String(index))}
                     deleteTestId={testId(TID_MODEL_PROVIDER_MODEL_DELETE_BUTTON, String(index))}
                     model={model}

@@ -67,100 +67,10 @@ describe("settingService", () => {
     process.env.ZCODE_DESKTOP_HOME_DIR = desktopHome;
     process.env.ZCODE_ENV = "production";
     const service = await createSettingServiceInHome(ordinaryHome);
-    await service.update({ providerFamilyDomain: "bigmodel" });
+    await service.update({ zcodeInteractionBehavior: "guide" });
     expect(existsSync(join(desktopHome, ".zcode", "v2", "setting.json"))).toBe(true);
     expect(existsSync(join(ordinaryHome, ".zcode", "v2", "setting.json"))).toBe(false);
-    expect((await service.get()).providerFamilyDomain).toBe("bigmodel");
-  });
-  it("账号查询的迟到保存不能覆盖用户手动切换的连接", async () => {
-    const home = makeTempHome();
-    const service = await createSettingServiceInHome(home);
-    await service.update({
-      providerFamilyDomain: "bigmodel",
-      providerFamilyConnectionSelections: { bigmodel: { kind: "start-plan" } },
-    });
-    const original = await service.get();
-    await service.update({
-      providerFamilyConnectionSelections: {
-        bigmodel: { kind: "team-coding-plan", productId: "p", organizationId: "o", projectId: "j" },
-      },
-    });
-    await expect(
-      service.update(
-        { providerFamilyConnectionSelections: { bigmodel: { kind: "individual-coding-plan" } } },
-        {
-          providerFamilyDomain: original.providerFamilyDomain,
-          providerFamilyConnectionSelections: original.providerFamilyConnectionSelections,
-        },
-      ),
-    ).rejects.toThrow("Account connection settings changed");
-    expect((await service.get()).providerFamilyConnectionSelections?.bigmodel?.kind).toBe(
-      "team-coding-plan",
-    );
-  });
-  it("迁移旧账号连接并保留回滚字段，新版选择不再被旧字段覆盖", async () => {
-    const home = makeTempHome();
-    const dir = join(home, ".zcode", "v2");
-    mkdirSync(dir, { recursive: true });
-    const file = join(dir, "setting.json");
-    const legacy = {
-      modelProviderFamilyModes: { bigmodel: "oauth", zai: "oauth" },
-      modelProviderFamilySelectedKeys: {
-        bigmodel: "team-plan:builtin:bigmodel-coding-plan:pro:org%3Aa:project-a",
-        zai: "coding-plan:builtin:zai-start-plan",
-      },
-      closeToTrayOnWindowsMigrationInitialized: true,
-      messageStreamShowReasoningMigrationInitialized: true,
-    };
-    writeFileSync(file, JSON.stringify(legacy));
-    const service = await createSettingServiceInHome(home);
-    const expected = {
-      bigmodel: {
-        kind: "team-coding-plan",
-        productId: "pro",
-        organizationId: "org:a",
-        projectId: "project-a",
-      },
-      zai: { kind: "start-plan" },
-    };
-    expect((await service.get()).providerFamilyConnectionSelections).toEqual(expected);
-    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
-      ...legacy,
-      providerFamilyConnectionSelections: expected,
-    });
-    await service.update({ providerFamilyConnectionSelections: {} });
-    expect((await service.get()).providerFamilyConnectionSelections).toEqual({});
-    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
-      modelProviderFamilySelectedKeys: legacy.modelProviderFamilySelectedKeys,
-    });
-  });
-
-  it("旧个人连接可迁移，API 模式和缺组织的 Team 不猜成个人套餐", async () => {
-    const home = makeTempHome();
-    const dir = join(home, ".zcode", "v2");
-    mkdirSync(dir, { recursive: true });
-    const file = join(dir, "setting.json");
-    writeFileSync(
-      file,
-      JSON.stringify({
-        modelProviderFamilySelectedKeys: {
-          bigmodel: "coding-plan:builtin:bigmodel-coding-plan",
-          zai: "team-plan:builtin:zai-coding-plan:pro:project",
-        },
-      }),
-    );
-    const service = await createSettingServiceInHome(home);
-    expect((await service.get()).providerFamilyConnectionSelections).toEqual({
-      bigmodel: { kind: "individual-coding-plan" },
-    });
-    writeFileSync(
-      file,
-      JSON.stringify({
-        modelProviderFamilyModes: { bigmodel: "apiKey" },
-        modelProviderFamilySelectedKeys: { bigmodel: "coding-plan:builtin:bigmodel-coding-plan" },
-      }),
-    );
-    expect((await service.get()).providerFamilyConnectionSelections).toEqual({});
+    expect((await service.get()).zcodeInteractionBehavior).toBe("guide");
   });
 
   it("缺少 setting.json 时返回默认值", async () => {

@@ -3,8 +3,6 @@ import {
   recordRequestSecurityCaptureMode,
   requestSecurityWorkerEnv,
   requestSecurityEndpointEnv,
-  restoreRequestSecurityEndpointEnv,
-  requestSecurityClientConfig,
   requestSecurityAgentConfig,
   requestSecuritySpecTimeout,
   startRequestSecurityFixture,
@@ -17,7 +15,7 @@ import {
 /* eslint-disable max-lines -- WDIO 配置需要集中维护 Electron、Xvfb、代理和容器 demo 参数，拆开会让测试入口更难追踪。 */
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
@@ -57,17 +55,17 @@ import { runE2EBeforeSessionSetup } from "./test/e2e/helpers/e2e-before-session.
 import { resolveAskUserQuestionClockScaleForWorker } from "./test/e2e/helpers/e2e-worker-environment.js";
 import {
   CODING_PLAN_TEAM_MOCK_BASE_URL_ENV,
-  CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV,
   applyCodingPlanTeamMockEnv,
-  applyCodingPlanUpgradeMockEnv,
   clearCodingPlanTeamMockEnv,
-  clearCodingPlanUpgradeMockEnv,
   shouldPrepareCodingPlanTeamMock,
 } from "./test/e2e/helpers/coding-plan-mock-env.js";
 import {
-  HIGHSPEED_MOCK_SCENARIO_ENV,
-  resolveHighspeedE2EMockScenario,
-} from "./test/e2e/helpers/highspeed-mock-env.js";
+  applyClientScenesMockEnv,
+  clearClientScenesMockEnv,
+  shouldUseClientScenesMock,
+  startClientScenesMockServer,
+  type ClientScenesMockServer,
+} from "./test/e2e/helpers/client-scenes-mock-server.js";
 import { createE2ERendererBridgeRootHooks } from "./test/e2e/helpers/e2e-renderer-bridge-root-hook.js";
 import { installHookTrustFixture } from "./test/e2e/helpers/hook-trust-fixture.js";
 import { resolveUpstreamModels } from "./test/e2e/helpers/upstream-recorded-models.js";
@@ -85,13 +83,10 @@ import {
   resolveE2EWorkerChromiumProfileDir,
   workerSpecsContain,
 } from "./test/e2e/helpers/e2e-worker-isolation.js";
-import { createE2EStartupCredentialSeed } from "./test/e2e/helpers/e2e-startup-credentials.js";
-import { prepareOAuthCompletionRaceFixture } from "./test/e2e/helpers/oauth-completion-race-fixture.js";
-import { prepareAccessToken401Fixture } from "./test/e2e/helpers/access-token-401-fixture.js";
 import { createE2EReplayFixtureVariables } from "./test/e2e/helpers/e2e-runtime-paths.js";
 import { stageE2EAppOutput } from "./test/e2e/helpers/e2e-app-output-stage.js";
 import { ensureSshRemoteReleaseAssets } from "./test/e2e/helpers/e2e-ssh-remote-release-assets.js";
-import { ASK_USER_QUESTION_E2E_CLOCK_SCALE_ENV, BIGMODEL_PROVIDER_ID } from "@zcode/shared";
+import { ASK_USER_QUESTION_E2E_CLOCK_SCALE_ENV } from "@zcode/shared";
 import {
   seedPersonalProviderConfig,
   seedPersonalDefaultModelSelection,
@@ -102,13 +97,6 @@ import {
   startE2ENetworkCaptureProxy,
   type E2ENetworkCaptureProxy,
 } from "./test/e2e/helpers/network-capture-proxy.js";
-import {
-  resetCodingPlanUpgradeMockServer,
-  resolveCodingPlanUpgradeMockScenario,
-  shouldPrepareCodingPlanUpgradeMockForBuild,
-  startCodingPlanUpgradeMockServer,
-  type CodingPlanUpgradeMockServer,
-} from "./test/e2e/helpers/coding-plan-upgrade-mock-server.js";
 import {
   hasRequiredSshE2EEnvironment,
   resolveEnvironmentGatedFormalSpecExcludes,
@@ -125,18 +113,6 @@ import {
   startModelContextBudgetConfigMockServer,
   type ModelContextBudgetConfigMockServer,
 } from "./test/e2e/helpers/model-context-budget-config-mock-server.js";
-import {
-  MODEL_PROVIDER_CATALOG_PAYLOAD,
-  resolveSubagentLoginCatalogConfigVersion,
-  resolveSubagentLoginCatalogPayload,
-} from "./test/e2e/helpers/model-provider-catalog-mock-server.js";
-import {
-  applyClientScenesMockEnv,
-  clearClientScenesMockEnv,
-  shouldUseClientScenesMock,
-  startClientScenesMockServer,
-  type ClientScenesMockServer,
-} from "./test/e2e/helpers/client-scenes-mock-server.js";
 import {
   resolvePluginCdnZipMarketplaceLastUpdated,
   seedPluginCdnZipMarketplaceFixture,
@@ -204,18 +180,13 @@ const E2E_APP_CREDENTIALS_FILE = resolve(E2E_APP_CONFIG_DIR, "credentials.json")
 const E2E_APP_PROVIDER_CONFIG_FILE = resolve(E2E_APP_CONFIG_DIR, "provider_config.json");
 // staged Electron app 只有 main/host/renderer 产物，不携带仓库级 config/provider。
 // 若让 Host 依据 app.getAppPath() 推导 bundled config，重启后会把不存在的路径当作
-// bundled release，模型配置初始化直接失败。E2E 明确注入同一份只读基线；off-peak
-// spec 会在 startOffPeakE2EMock 中覆盖为带 mock endpoint 的 case-local 文件。
+// bundled release，模型配置初始化直接失败。E2E 明确注入同一份只读基线。
 const E2E_DEFAULT_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE = resolve(
   REPO_ROOT,
   "config/provider/zcode-builtin.json",
 );
 const INITIAL_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE =
   process.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE?.trim();
-const E2E_OFFPEAK_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE = resolve(
-  REPO_ROOT,
-  ".cache/desktop-e2e-provider-config/official-offpeak-mock.json",
-);
 const E2E_AGENTS_STATE_FILE = resolve(E2E_APP_CONFIG_DIR, "agents-state.json");
 const E2E_CLI_CONFIG_DIR = resolve(E2E_STORAGE_ROOT, "cli");
 const E2E_CLI_CONFIG_FILE = resolve(E2E_CLI_CONFIG_DIR, "config.json");
@@ -281,13 +252,6 @@ const UI_SHELL_MANUAL_REVIEW_SPEC_GLOB = "./test/e2e/ui-shell/manual-review/**/*
 const BROWSER_PERMISSION_MANUAL_REVIEW_SPEC_GLOB =
   "./test/e2e/browser-permission/manual-review/**/*.test.ts";
 const GIT_COMMIT_DIALOG_UI_FLOW_SPEC = "git-commit-dialog-ui-flow.test.ts";
-const OAUTH_CREDENTIAL_RECOVERY_SPEC = "oauth-credential-recovery.test.ts";
-const JWT_EXPIRY_REAUTHENTICATION_SPEC = "jwt-expiry-reauthentication.test.ts";
-const SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_SPEC =
-  "subagent-coding-plan-login-catalog-stale.test.ts";
-const SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE = "subagent-login-catalog-stale";
-const SUBAGENT_CODING_PLAN_OAUTH_FLOW_ID = "e2e-subagent-bigmodel-flow";
-const SUBAGENT_CODING_PLAN_OAUTH_STATE = "e2e-subagent-bigmodel-state";
 const PROVIDER_READINESS_AGENT_STARTUP_SPEC = "provider-readiness-agent-startup.test.ts";
 const CONTEXT_WINDOW_COLD_RESUME_SPEC = "conversation-session-context-window-cold-resume.test.ts";
 const PASSIVE_AGENT_STARTUP_SPEC = "workspace-passive-agent-startup.test.ts";
@@ -344,10 +308,6 @@ const SUBAGENT_RUNTIME_CATALOG_PROVIDER_ID = "e2e-claude-runtime-catalog";
 const SUBAGENT_RUNTIME_CATALOG_PROVIDER_NAME = "Claude Runtime Catalog E2E";
 const SUBAGENT_RUNTIME_CATALOG_MODEL = "claude-opus-4-8";
 const SUBAGENT_RUNTIME_CATALOG_AGENT_NAME = "e2e-claude-catalog-reviewer";
-const OFFPEAK_SUBAGENT_MODEL_INHERITANCE_SPEC =
-  "conversation-session-offpeak-subagent-model-inheritance.test.ts";
-const OFFPEAK_INVALID_TICKET_SPEC = "conversation-session-off-peak-invalid-ticket.test.ts";
-const MODEL_PROVIDER_PLAN_SURFACE_SPEC = "conversation-session-model-provider-plan-surface.test.ts";
 const SUBAGENT_TEAM_SCOPE_SPEC = "conversation-session-subagent-team-scope.test.ts";
 const TOOL_ERROR_SURFACE_SPEC = "conversation-session-tool-error-surface.test.ts";
 const MODEL_OUTPUT_TOKEN_BUDGET_SPEC = "conversation-session-model-output-token-budget.test.ts";
@@ -368,13 +328,6 @@ const CODING_PLAN_MODEL_SSE_BODY =
   'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n' +
   'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":12}}\n\n' +
   'event: message_stop\ndata: {"type":"message_stop"}\n\n';
-const E2E_AUTH_PROVIDER_ID = "zai";
-const E2E_AUTH_TOKEN = "e2e-oauth-token";
-const E2E_USER_PROFILE = {
-  displayName: "ZCode E2E",
-  id: "zcode-e2e-user",
-  username: "zcode-e2e-user",
-};
 const GLM_HIGHSPEED_E2E_PROVIDER_ID = "e2e-glmhighspeed";
 const GLM_HIGHSPEED_E2E_MODEL = "glm-5.1-highspeed";
 const GLM_HIGHSPEED_E2E_BASE_URL = "https://open.bigmodel.cn/api";
@@ -620,12 +573,9 @@ let upstreamReplayServer: UpstreamReplayServer | null = null;
 let codingPlanTeamMockServer: Server | null = null;
 let codingPlanTeamMockBaseUrl = "";
 let codingPlanDataPlaneProxy: E2ENetworkCaptureProxy | null = null;
-let codingPlanUpgradeMockServer: CodingPlanUpgradeMockServer | null = null;
 let modelContextBudgetConfigMockServer: ModelContextBudgetConfigMockServer | null = null;
 let dynamicWorkflowConfigMockServer: DynamicWorkflowConfigMockServer | null = null;
 let clientScenesMockServer: ClientScenesMockServer | null = null;
-let stopOAuthCompletionRaceFixture: (() => Promise<void>) | null = null;
-let stopAccessToken401Fixture: (() => Promise<void>) | null = null;
 let pluginCdnZipFixtureServer: PluginCdnZipFixtureServer | null = null;
 let upstreamE2EBaseUrl: string = e2eProviderPreset.baseUrl;
 let e2eRunnerExitWatchdog: ReturnType<typeof setTimeout> | null = null;
@@ -1182,22 +1132,9 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
     );
   }
 
-  let caseMode:
-    | "default"
-    | typeof SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE
-    | "model-provider-plan-surface" = "default";
-  let subagentOAuthTokenIssued = false;
-  let modelProviderCatalogMode: "full" | "partial" | "unavailable" = "full";
   let presentation: EntitlementPresentation | undefined;
   let scenario: "personalOnly" | "teamOnly" | "both" = "both";
-  // Bug 回归：Start Plan 独立 case 需要 billing/balance 返回 Start Plan 权益与模型，
-  // 让体验套餐和 Coding Plan 从首启就真实共存；mock 只在 onPrepare 创建一次，
-  // 必须在创建时固定该模式，后续 worker 共享同一个 server 状态。
-  const startIndependent = workerSpecsContain(
-    specs,
-    "conversation-session-start-plan-independent.test.ts",
-  );
-  let providerResponsive = startIndependent;
+  let providerResponsive = false;
   let faultMode:
     | "none"
     | "optionalActivity"
@@ -1244,17 +1181,7 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (url.pathname === "/__e2e/coding-plan/case-mode" && request.method === "POST") {
       presentation = undefined;
-      const body = await readRequestJson<{ mode?: typeof caseMode }>(request);
-      caseMode =
-        body.mode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE
-          ? SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE
-          : body.mode === "model-provider-plan-surface"
-            ? "model-provider-plan-surface"
-            : "default";
-      subagentOAuthTokenIssued = false;
-      modelProviderCatalogMode = "full";
-      scenario =
-        caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE ? "personalOnly" : "both";
+      scenario = "both";
       faultMode = "none";
       resetScenario = "none";
       resetScenarioStartedAt = Date.now();
@@ -1266,22 +1193,11 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
       resetMultiUnread = false;
       resetMultiLag = null;
       requests.length = 0;
-      writeJson(response, { mode: caseMode, ok: true });
+      writeJson(response, { mode: "default", ok: true });
       return;
     }
     if (url.pathname === "/__e2e/coding-plan/team-health" && request.method === "GET") {
       writeJson(response, { ok: true, mock: "team" });
-      return;
-    }
-
-    if (url.pathname === "/__e2e/coding-plan/catalog-mode" && request.method === "POST") {
-      const body = await readRequestJson<{ mode?: string }>(request);
-      if (body.mode !== "full" && body.mode !== "partial" && body.mode !== "unavailable") {
-        writeJson(response, { code: 400, msg: "invalid catalog mode" }, 400);
-        return;
-      }
-      modelProviderCatalogMode = body.mode;
-      writeJson(response, { mode: modelProviderCatalogMode, ok: true });
       return;
     }
 
@@ -1378,117 +1294,6 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
     }
 
     if (
-      caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE &&
-      request.method === "POST" &&
-      url.pathname === "/api/v1/oauth/cli/init"
-    ) {
-      writeJson(response, {
-        code: 0,
-        data: {
-          authorize_url: `https://bigmodel.cn/login?appId=zcode&redirect=${encodeURIComponent("https://zcode.z.ai/api/v1/oauth/cli/callback/bigmodel")}&state=${SUBAGENT_CODING_PLAN_OAUTH_STATE}`,
-          expires_at: Math.floor(Date.now() / 1000) + 300,
-          flow_id: SUBAGENT_CODING_PLAN_OAUTH_FLOW_ID,
-          poll_interval_sec: 30,
-        },
-        msg: "",
-      });
-      return;
-    }
-
-    if (caseMode === "model-provider-plan-surface" && request.method === "GET") {
-      if (url.pathname === "/api/v2/releases/latest") {
-        writeJson(response, {
-          config_version: "e2e-model-provider-catalog-v1",
-          version: "3.8.1-e2e",
-        });
-        return;
-      }
-      if (url.pathname === "/api/v1/client/configs") {
-        if (modelProviderCatalogMode === "unavailable") {
-          writeJson(
-            response,
-            { code: 503, data: null, msg: "catalog temporarily unavailable" },
-            503,
-          );
-          return;
-        }
-        if (modelProviderCatalogMode === "partial") {
-          writeJson(response, {
-            ...MODEL_PROVIDER_CATALOG_PAYLOAD,
-            data: {
-              ...MODEL_PROVIDER_CATALOG_PAYLOAD.data,
-              builtinModels: MODEL_PROVIDER_CATALOG_PAYLOAD.data.builtinModels.slice(0, 1),
-              builtinProviders: MODEL_PROVIDER_CATALOG_PAYLOAD.data.builtinProviders.slice(0, 1),
-            },
-          });
-          return;
-        }
-        writeJson(response, MODEL_PROVIDER_CATALOG_PAYLOAD);
-        return;
-      }
-    }
-
-    if (
-      caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE &&
-      request.method === "GET" &&
-      url.pathname === `/api/v1/oauth/cli/poll/${SUBAGENT_CODING_PLAN_OAUTH_FLOW_ID}`
-    ) {
-      writeJson(response, {
-        code: 0,
-        data: { status: "pending" },
-        msg: "",
-      });
-      return;
-    }
-
-    if (
-      caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE &&
-      request.method === "POST" &&
-      url.pathname === "/api/v1/oauth/token"
-    ) {
-      subagentOAuthTokenIssued = true;
-      writeJson(response, {
-        code: 0,
-        data: {
-          token: "e2e-subagent-login-zcode-jwt",
-          bigmodel: {
-            access_token: "e2e-subagent-login-bigmodel-token",
-            refresh_token: "e2e-subagent-login-bigmodel-refresh-token",
-          },
-        },
-        msg: "",
-      });
-      return;
-    }
-
-    if (
-      caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE &&
-      request.method === "GET" &&
-      url.pathname === "/api/v2/releases/latest"
-    ) {
-      writeJson(response, {
-        config_version: resolveSubagentLoginCatalogConfigVersion(subagentOAuthTokenIssued),
-        version: "3.8.1-e2e",
-      });
-      return;
-    }
-
-    if (
-      caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE &&
-      request.method === "GET" &&
-      url.pathname === "/api/v1/client/configs"
-    ) {
-      writeJson(
-        response,
-        resolveSubagentLoginCatalogPayload({
-          configVersion: url.searchParams.get("config_version"),
-          oauthTokenIssued: subagentOAuthTokenIssued,
-        }),
-      );
-      return;
-    }
-
-    if (
       faultMode === "startBalanceFailure" &&
       url.pathname === "/api/v1/zcode-plan/billing/balance"
     ) {
@@ -1503,47 +1308,8 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
     ) {
       writeJson(
         response,
-        buildProviderResponsiveStartBalance(startIndependent ? "GLM-5.2" : undefined),
+        buildProviderResponsiveStartBalance(),
       );
-      return;
-    }
-
-    if (
-      caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE &&
-      request.method === "GET" &&
-      url.pathname === "/api/v1/zcode-plan/billing/balance"
-    ) {
-      writeJson(response, {
-        code: 0,
-        data: { balances: [], plans: [] },
-        msg: "",
-        success: true,
-      });
-      return;
-    }
-
-    if (
-      caseMode === "model-provider-plan-surface" &&
-      request.method === "GET" &&
-      url.pathname === "/api/v1/zcode-plan/billing/balance"
-    ) {
-      // 计划交叉用例需要一份确定的 Start Plan 权益；普通 Coding Plan 用例仍按
-      // 自己的订阅接口判定，不把 Start 权益泄漏到其他 spec。
-      writeJson(response, {
-        code: 0,
-        data: {
-          plans: [
-            {
-              plan_id: "zcode-v3-start-plan",
-              name: "ZCode V3 Start Plan",
-              status: "active",
-            },
-          ],
-          balances: [],
-        },
-        msg: "",
-        success: true,
-      });
       return;
     }
 
@@ -1650,16 +1416,6 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
       return;
     }
 
-    if (startIndependent && url.pathname === "/api/v1/client/configs") {
-      writeJson(response, {
-        code: 0,
-        success: true,
-        data: {
-          configs: requestSecurityClientConfig(),
-        },
-      });
-      return;
-    }
     if (url.pathname === "/api/v1/agent/configs") {
       writeJson(response, {
         code: 0,
@@ -1702,22 +1458,12 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
       writeJson(response, {
         code: 200,
         data: {
-          ...(caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE
-            ? {
-                avatar: "",
-                customerName: "Subagent Login E2E",
-                customerNumber: "subagent-login-e2e-user",
-                nickName: "Subagent Login E2E",
-              }
-            : {}),
           organizations: [
             {
               organizationId: "org-team-a",
               organizationName: providerResponsive ? PROVIDER_RESPONSIVE_TEAM_NAME : "Team Org",
               projects: [
-                ...(scenario !== "teamOnly" ||
-                caseMode === SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE ||
-                caseMode === "model-provider-plan-surface"
+                ...(scenario !== "teamOnly"
                   ? [
                       {
                         projectId: "proj-personal-a",
@@ -2022,7 +1768,7 @@ async function startCodingPlanTeamMockIfNeeded(specs: string[] = []) {
   const address = codingPlanTeamMockServer.address() as AddressInfo;
   codingPlanTeamMockBaseUrl = `http://127.0.0.1:${address.port}`;
   applyCodingPlanTeamMockEnv(process.env, codingPlanTeamMockBaseUrl);
-  await startCodingPlanDataPlaneProxy(specs);
+  await startCodingPlanDataPlaneProxy();
 }
 
 async function isCodingPlanTeamMockAlive(baseUrl: string): Promise<boolean> {
@@ -2045,11 +1791,7 @@ async function configureCodingPlanTeamMockForSpecs(specs: string[]) {
   if (!baseUrl) {
     throw new Error("coding plan mock case mode 配置失败：mock URL 未初始化");
   }
-  const mode = isSubagentCodingPlanLoginCatalogStaleSpec(specs)
-    ? SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_MODE
-    : isModelProviderPlanSurfaceSpec(specs)
-      ? "model-provider-plan-surface"
-      : "default";
+  const mode = "default";
   const response = await fetch(`${baseUrl}/__e2e/coding-plan/case-mode`, {
     body: JSON.stringify({ mode }),
     headers: { "content-type": "application/json" },
@@ -2085,104 +1827,13 @@ async function stopCodingPlanTeamMock() {
   clearCodingPlanTeamMockEnv(process.env, ownedBaseUrl);
 }
 
-const HIGHSPEED_DATA_PLANE_FIXTURE_PATHS = [
-  "test/e2e/fixtures/upstream/conversation-session/conversation-session-highspeed-card.json",
-  "test/e2e/fixtures/upstream/conversation-session/conversation-session-highspeed-card-draw-timeout.json",
-  "test/e2e/fixtures/upstream/conversation-session/conversation-session-highspeed-card-draw-miss.json",
-];
-
-interface DataPlaneTurnFixture {
-  match: { lastUserMessageIncludes: string[] };
-  response: { body: string };
-}
-
-async function readDataPlaneTurnFixtures(path: string): Promise<DataPlaneTurnFixture[]> {
-  return (
-    JSON.parse(await readFile(resolve(DESKTOP_DIR, path), "utf8")) as {
-      fixtures: DataPlaneTurnFixture[];
-    }
-  ).fixtures;
-}
-
-/**
- * Account 数据面按最后一条 user message 的标记回放 case-local 固定响应；
- * 非流式请求是标题 sidecar（generateText），统一返回固定标题。
- */
-function createDataPlaneTurnResponder(
-  fixtures: readonly DataPlaneTurnFixture[],
-  options: { fallbackBody: string; title: { id: string; text: string } },
-) {
-  return (requestBody: string) => {
-    const request = JSON.parse(requestBody) as {
-      stream?: boolean;
-      messages?: Array<{ role: string; content: unknown }>;
-    };
-    if (request.stream !== true)
-      return JSON.stringify({
-        id: options.title.id,
-        type: "message",
-        role: "assistant",
-        model: "GLM-5.2",
-        content: [{ type: "text", text: options.title.text }],
-        stop_reason: "end_turn",
-        usage: { input_tokens: 10, output_tokens: 4 },
-      });
-    const messages = request.messages ?? [];
-    const lastUser = JSON.stringify(
-      messages.findLast((message) => message.role === "user")?.content,
-    );
-    return (
-      fixtures.find((fixture) =>
-        fixture.match.lastUserMessageIncludes.every((marker) => lastUser?.includes(marker)),
-      )?.response.body ?? options.fallbackBody
-    );
-  };
-}
-
-async function startCodingPlanDataPlaneProxy(specs: readonly string[]) {
+async function startCodingPlanDataPlaneProxy() {
   if (codingPlanDataPlaneProxy) {
     for (const [key, value] of Object.entries(codingPlanDataPlaneProxy.env)) {
       process.env[key] = value;
     }
     return;
   }
-  // SR87 的真实请求走 Account 数据面，而非 上游 代理；必须让本例的
-  // case-local fixture 真正供该数据面使用，不能只登记一份永远不命中的回放文件。
-  const modelResponseBody = specs.some((spec) =>
-    spec.includes("conversation-session-model-provider-effective-selection.test.ts"),
-  )
-    ? (
-        JSON.parse(
-          await readFile(
-            resolve(
-              DESKTOP_DIR,
-              "test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-effective-selection.json",
-            ),
-            "utf8",
-          ),
-        ) as {
-          fixtures: Array<{ response: { body: string } }>;
-        }
-      ).fixtures[0]!.response.body
-    : CODING_PLAN_MODEL_SSE_BODY;
-  const startIndependentFixtures = specs.some((spec) =>
-    spec.includes("conversation-session-start-plan-independent.test.ts"),
-  )
-    ? await readDataPlaneTurnFixtures(
-        "test/e2e/fixtures/upstream/conversation-session/conversation-session-start-plan-independent.json",
-      )
-    : null;
-  // Highspeed 抽卡 case 的每轮请求都走 Team Coding Plan 内建 HTTPS Endpoint（spec §7）；
-  // 静态 body 无法区分轮次，多轮 case 会在首轮就误判完成，必须按轮次标记回放。
-  const highspeedFixtures = specs.some((spec) =>
-    spec.includes("conversation-session-highspeed-card"),
-  )
-    ? (
-        await Promise.all(
-          HIGHSPEED_DATA_PLANE_FIXTURE_PATHS.map((path) => readDataPlaneTurnFixtures(path)),
-        )
-      ).flat()
-    : null;
   codingPlanDataPlaneProxy = await startE2ENetworkCaptureProxy({
     artifactPath: CODING_PLAN_DATA_PLANE_ARTIFACT_PATH,
     caDir: E2E_CODING_PLAN_DATA_PLANE_CA_DIR,
@@ -2194,27 +1845,8 @@ async function startCodingPlanDataPlaneProxy(specs: readonly string[]) {
         path: "/api/paas/c1f3a7e2/v2/client",
         body: JSON.stringify({ code: 500, msg: "E2E handshake unavailable" }),
       },
-      ...(startIndependentFixtures
-        ? [
-            {
-              host: "start154-e2e.invalid",
-              method: "POST",
-              path: "/v1/messages",
-              headers: { "content-type": "text/event-stream; charset=utf-8" },
-              body: createDataPlaneTurnResponder(startIndependentFixtures, {
-                fallbackBody: CODING_PLAN_MODEL_SSE_BODY,
-                title: { id: "start154-title", text: "Start154 checks" },
-              }),
-            },
-          ]
-        : []),
       {
-        body: highspeedFixtures
-          ? createDataPlaneTurnResponder(highspeedFixtures, {
-              fallbackBody: modelResponseBody,
-              title: { id: "highspeed-title", text: '{"title":"Highspeed draw"}' },
-            })
-          : modelResponseBody,
+        body: CODING_PLAN_MODEL_SSE_BODY,
         headers: { "content-type": "text/event-stream; charset=utf-8" },
         host: "open.bigmodel.cn",
         method: "POST",
@@ -2307,158 +1939,6 @@ async function stopUpstreamE2EHttp() {
     await upstreamReplayServer.stop();
     upstreamReplayServer = null;
   }
-}
-
-async function startCodingPlanUpgradeE2EMock(
-  specs: string[] = [],
-  options: { prepareForBuild?: boolean } = {},
-) {
-  const resolvedScenario = resolveCodingPlanUpgradeMockScenario(specs);
-  const scenario =
-    resolvedScenario ??
-    (options.prepareForBuild && shouldPrepareCodingPlanUpgradeMockForBuild(specs)
-      ? "webview-refresh-provider"
-      : null);
-  if (!scenario) {
-    await stopCodingPlanUpgradeE2EMock();
-    return;
-  }
-  const preparedBaseUrl = process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim();
-  if (!codingPlanUpgradeMockServer && preparedBaseUrl) {
-    await resetCodingPlanUpgradeMockServer(preparedBaseUrl, scenario);
-    applyCodingPlanUpgradeMockEnv(process.env, preparedBaseUrl);
-    return;
-  }
-  if (codingPlanUpgradeMockServer) {
-    await resetCodingPlanUpgradeMockServer(codingPlanUpgradeMockServer.baseUrl, scenario);
-    applyCodingPlanUpgradeMockEnv(process.env, codingPlanUpgradeMockServer.baseUrl);
-    return;
-  }
-  codingPlanUpgradeMockServer = await startCodingPlanUpgradeMockServer(scenario, {
-    marketingTouch: specs.some((spec) => spec.includes("marketing-touch-")),
-  });
-  process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV] = codingPlanUpgradeMockServer.baseUrl;
-  applyCodingPlanUpgradeMockEnv(process.env, codingPlanUpgradeMockServer.baseUrl);
-}
-
-// 闲时任务 E2E：off-peak spec 命中时开进程内 mock 网关（ZCODE_OFFPEAK_MOCK=1），
-// host 继承 worker env 后自动起网关、灰度强制开启；管理类 GUI spec 保持票据短暂 queued，
-// 避免创建落库唤醒 scheduler 后在 UI 来得及操作前就派发模型请求。
-async function startOffPeakE2EMock(specs: string[] = []): Promise<void> {
-  const isOffPeakSpec = specs.some((spec) => spec.includes("off-peak") || spec.includes("offpeak"));
-  if (isOffPeakSpec) {
-    process.env.ZCODE_OFFPEAK_MOCK = "1";
-    process.env.ZCODE_OFFPEAK_MOCK_PORT = "45197";
-    const isSubagentInheritanceSpec = isOffPeakSubagentModelInheritanceSpec(specs);
-    const isInvalidTicketSpec = isOffPeakInvalidTicketSpec(specs);
-    // 管理类 case 延后 ready；OP10 必须真跑 scheduler→turn→child，因此取号即 ready。
-    process.env.ZCODE_OFFPEAK_MOCK_READY_DELAY_MS =
-      isSubagentInheritanceSpec || isInvalidTicketSpec ? "0" : "60000";
-    process.env.ZCODE_OFFPEAK_MOCK_READY_TTL_MS = "600000";
-    process.env.ZCODE_OFFPEAK_MOCK_ACTIVE_MS = "600000";
-    process.env.ZCODE_OFFPEAK_MOCK_NEXT_POLL_S = "1";
-    if (isSubagentInheritanceSpec) {
-      process.env.ZCODE_OFFPEAK_MOCK_SCENARIO = "foreground-subagents";
-    } else if (isInvalidTicketSpec) {
-      process.env.ZCODE_OFFPEAK_MOCK_SCENARIO = "invalid-ticket";
-    } else if (
-      specs.some((spec) =>
-        spec.includes("conversation-session-offpeak-create-existing-session.test.ts"),
-      )
-    ) {
-      // 绑定会话复用已有固定文本响应，保留 queued 编辑窗口；capture 模式会继续
-      // 转发上游，不适合作为此例的离线应答。fixture 只匹配一个 child marker，不创建子任务。
-      process.env.ZCODE_OFFPEAK_MOCK_SCENARIO = "foreground-subagents";
-    } else {
-      delete process.env.ZCODE_OFFPEAK_MOCK_SCENARIO;
-    }
-    // D39 回归 spec：专用 availability 返回 false + next_take_at，验证 renderer
-    // 使用服务端快照提前置灰；其余 off-peak spec 保持 availability=true。
-    const isLimitPreGateSpec = specs.some((spec) => spec.includes("off-peak-limit-pre-gate"));
-    if (isLimitPreGateSpec) {
-      process.env.ZCODE_OFFPEAK_MOCK_AVAILABILITY_BLOCK_MS = "3600000";
-    } else {
-      delete process.env.ZCODE_OFFPEAK_MOCK_AVAILABILITY_BLOCK_MS;
-    }
-    await materializeOffPeakMockZCodeBuiltinProviderConfig(
-      Number(process.env.ZCODE_OFFPEAK_MOCK_PORT),
-    );
-    process.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE = E2E_OFFPEAK_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE;
-  } else {
-    delete process.env.ZCODE_OFFPEAK_MOCK;
-    delete process.env.ZCODE_OFFPEAK_MOCK_AVAILABILITY_BLOCK_MS;
-    delete process.env.ZCODE_OFFPEAK_MOCK_PORT;
-    delete process.env.ZCODE_OFFPEAK_MOCK_SCENARIO;
-    if (INITIAL_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE) {
-      process.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE = INITIAL_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE;
-    } else {
-      delete process.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE;
-    }
-  }
-}
-
-async function materializeOffPeakMockZCodeBuiltinProviderConfig(port: number): Promise<void> {
-  const sourcePath = resolve(REPO_ROOT, "config/provider/zcode-builtin.json");
-  const document = JSON.parse(await readFile(sourcePath, "utf8")) as {
-    config?: {
-      providers?: Record<string, { api?: { baseUrl?: string }; builtinModelIds?: string[] }>;
-    };
-  };
-  const offPeakProviderIds = [
-    "account:zai-offpeak-idle-plan",
-    "account:bigmodel-offpeak-idle-plan",
-  ];
-  for (const providerId of offPeakProviderIds) {
-    const offPeakProvider = document.config?.providers?.[providerId];
-    if (!offPeakProvider?.api) {
-      throw new Error(`ZCode Built-in Config 缺少 ${providerId}.api`);
-    }
-    offPeakProvider.api.baseUrl = `http://127.0.0.1:${port}/api/v1/off-peak/anthropic`;
-    // 原闲时 fixture 的单模型白名单应迁到当前 Built-in 输入，不能继续依赖已退役的
-    // client-config models 字段；仅修改本次 E2E 隔离文件，生产名单不变。
-    offPeakProvider.builtinModelIds = ["GLM-5.2"];
-  }
-  await mkdir(resolve(E2E_OFFPEAK_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE, ".."), {
-    recursive: true,
-  });
-  await writeFile(
-    E2E_OFFPEAK_ZCODE_BUILTIN_PROVIDER_CONFIG_FILE,
-    `${JSON.stringify(document, null, 2)}\n`,
-    "utf8",
-  );
-}
-
-// Highspeed E2E 使用 Host 内置的确定性 transport；按 spec 注入场景，避免普通会话
-// 在默认测试套件里意外抽到卡。该变量必须在 Electron 启动前设置，Host 才能装配 mock。
-function configureHighspeedE2EMock(specs: string[] = []): void {
-  const scenario = resolveHighspeedE2EMockScenario(specs);
-  if (scenario) {
-    process.env[HIGHSPEED_MOCK_SCENARIO_ENV] = scenario;
-  } else {
-    delete process.env[HIGHSPEED_MOCK_SCENARIO_ENV];
-  }
-}
-
-async function stopCodingPlanUpgradeE2EMock() {
-  const ownedBaseUrl =
-    codingPlanUpgradeMockServer?.baseUrl ??
-    process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim() ??
-    "";
-  if (!codingPlanUpgradeMockServer) {
-    if (ownedBaseUrl) {
-      clearCodingPlanUpgradeMockEnv(process.env, ownedBaseUrl);
-    }
-    restoreE2EProviderEndpointEnv();
-    return;
-  }
-  await codingPlanUpgradeMockServer.stop();
-  codingPlanUpgradeMockServer = null;
-  clearCodingPlanUpgradeMockEnv(process.env, ownedBaseUrl);
-  restoreE2EProviderEndpointEnv();
-}
-
-function restoreE2EProviderEndpointEnv() {
-  restoreRequestSecurityEndpointEnv(process.env, e2eProviderPresetName, upstreamE2EHttpMode);
 }
 
 async function startModelContextBudgetConfigE2EMock(specs: string[] = []) {
@@ -3011,7 +2491,6 @@ function forceFinalizeE2ERunnerFromGuard() {
     try {
       await stopUpstreamE2EHttp();
       await stopCodingPlanTeamMock();
-      await stopCodingPlanUpgradeE2EMock();
       await stopRequestSecurityFixture();
       await stopModelContextBudgetConfigE2EMock();
       await stopDynamicWorkflowConfigE2EMock();
@@ -3250,23 +2729,10 @@ function seedE2EStartupState(specs: string[] = []) {
     // 测试基线显式 seed 项目会话，避免把“老 case 的 fixture”误当成新用户默认行为。
     mkdirSync(legacyDefaultProjectPath, { recursive: true });
   }
-  const now = Date.now();
-  const codingPlanTeamSpec = shouldUseCodingPlanTeamMock(specs);
-  const codingPlanUpgradeE2E = isCodingPlanUpgradeE2E(specs);
-  const oauthCredentialRecoverySpec = isOAuthCredentialRecoverySpec(specs);
-  const jwtExpiryReauthenticationSpec = isJwtExpiryReauthenticationSpec(specs);
-  const subagentLoginCatalogStaleSpec = isSubagentCodingPlanLoginCatalogStaleSpec(specs);
-  const builtInSubagentModelOverridesSpec = isBuiltInSubagentModelSelectionOverridesSpec(specs);
-  const providerReadinessColdStartFixture = usesProviderReadinessColdStartFixture(specs);
-  const shouldUseBigmodelAuth = codingPlanTeamSpec || codingPlanUpgradeE2E;
-  const authProviderId = shouldUseBigmodelAuth ? BIGMODEL_PROVIDER_ID : E2E_AUTH_PROVIDER_ID;
   writeFileSync(
     E2E_APP_SETTINGS_FILE,
     JSON.stringify(
       {
-        providerFamilyDomain: shouldUseBigmodelAuth ? "bigmodel" : "zai",
-        providerFamilyDomainMigrated: true,
-        providerFamilyDomainUpdatedAt: now,
         ...(modelProviderRegressionFixture
           ? {
               recentProjects: [legacyDefaultProjectPath, ...passiveWorkspacePaths],
@@ -3308,9 +2774,6 @@ function seedE2EStartupState(specs: string[] = []) {
               zcodeInteractionBehavior: "guide",
             }
           : {}),
-        providerFamilyConnectionSelections: shouldUseBigmodelAuth
-          ? { bigmodel: { kind: "individual-coding-plan" } }
-          : {},
         ...(upstreamCaptureProxy
           ? {
               // 修复原因：agent 子进程只信任设置页显式代理配置，不读取
@@ -3326,55 +2789,8 @@ function seedE2EStartupState(specs: string[] = []) {
     ),
     "utf-8",
   );
-  writeFileSync(
-    E2E_APP_CREDENTIALS_FILE,
-    JSON.stringify(
-      providerReadinessColdStartFixture
-        ? {}
-        : // Bug 根因：I20 不验证账号登录，却播种假 ZCode JWT；带账号身份的旁路请求
-          // 会把它发往真实控制面，401 随后弹出登录过期对话框并遮挡目标交互。
-          // 该 case 只保留本地 Provider 回放，不注入无关账号身份。
-          builtInSubagentModelOverridesSpec
-          ? {}
-          : subagentLoginCatalogStaleSpec
-            ? {}
-            : oauthCredentialRecoverySpec
-              ? createCorruptOAuthCredentialSeed(authProviderId)
-              : jwtExpiryReauthenticationSpec
-                ? createExpiredJwtOAuthCredentialSeed(authProviderId)
-                : createE2EStartupCredentialSeed({
-                    specs,
-                    legacyAuthToken: E2E_AUTH_TOKEN,
-                    restoredOAuthCredentials: {
-                      "oauth:active_provider": authProviderId,
-                      [`oauth:${E2E_AUTH_PROVIDER_ID}:access_token`]: E2E_AUTH_TOKEN,
-                      [`oauth:${E2E_AUTH_PROVIDER_ID}:user_info`]: JSON.stringify(E2E_USER_PROFILE),
-                      ...(shouldUseBigmodelAuth
-                        ? {
-                            "oauth:bigmodel:access_token": "e2e-bigmodel-oauth-token",
-                            "oauth:bigmodel:user_info": JSON.stringify(E2E_USER_PROFILE),
-                          }
-                        : {}),
-                      zcodejwttoken: E2E_AUTH_TOKEN,
-                    },
-                  }),
-      null,
-      2,
-    ),
-    "utf-8",
-  );
-}
-
-function isOAuthCredentialRecoverySpec(specs: string[] = []) {
-  return workerSpecsContain(specs, OAUTH_CREDENTIAL_RECOVERY_SPEC);
-}
-
-function isJwtExpiryReauthenticationSpec(specs: string[] = []) {
-  return workerSpecsContain(specs, JWT_EXPIRY_REAUTHENTICATION_SPEC);
-}
-
-function isSubagentCodingPlanLoginCatalogStaleSpec(specs: string[] = []) {
-  return workerSpecsContain(specs, SUBAGENT_CODING_PLAN_LOGIN_CATALOG_STALE_SPEC);
+  // 智谱账号体系已移除且没有内置 OAuth 渠道；E2E 一律从无账号态启动。
+  writeFileSync(E2E_APP_CREDENTIALS_FILE, JSON.stringify({}, null, 2), "utf-8");
 }
 
 function usesProviderReadinessColdStartFixture(specs: string[] = []) {
@@ -3421,38 +2837,6 @@ async function runGitReviewEntryCommand(cwd: string, args: string[]) {
     encoding: "utf8",
     windowsHide: true,
   });
-}
-
-function createCorruptOAuthCredentialSeed(authProviderId: string): Record<string, string> {
-  const corruptEncryptedValue = "enc:v1:bad.bad.bad";
-  return {
-    // Bugfix: 这个 spec 需要冷启动复现线上“密文存在但当前机器无法解密”的状态；
-    // 只损坏 active provider 就足以触发 OAuth 会话清理，并验证用户仍能看到登录入口。
-    "oauth:active_provider": corruptEncryptedValue,
-    [`oauth:${authProviderId}:access_token`]: "stale-access-token",
-    [`oauth:${authProviderId}:refresh_token`]: "stale-refresh-token",
-    [`oauth:${authProviderId}:user_info`]: JSON.stringify(E2E_USER_PROFILE),
-    [`oauth:${BIGMODEL_PROVIDER_ID}:access_token`]: "stale-bigmodel-access-token",
-    [`oauth:${BIGMODEL_PROVIDER_ID}:refresh_token`]: "stale-bigmodel-refresh-token",
-    [`oauth:${BIGMODEL_PROVIDER_ID}:user_info`]: JSON.stringify(E2E_USER_PROFILE),
-    zcodejwttoken: "stale-zcode-jwt-token",
-  };
-}
-
-function createExpiredJwtOAuthCredentialSeed(authProviderId: string): Record<string, string> {
-  return {
-    "oauth:active_provider": authProviderId,
-    [`oauth:${authProviderId}:access_token`]: "expired-session-access-token",
-    [`oauth:${authProviderId}:refresh_token`]: "expired-session-refresh-token",
-    [`oauth:${authProviderId}:user_info`]: JSON.stringify(E2E_USER_PROFILE),
-    // Bug 回归 fixture：exp=1 明确早于任意测试运行时间；客户端只解析 exp，
-    // 不验证这枚本地测试 JWT 的签名。
-    zcodejwttoken: "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjF9.e2e",
-  };
-}
-
-function isCodingPlanUpgradeE2E(specs: string[] = []) {
-  return resolveCodingPlanUpgradeMockScenario(specs) !== null;
 }
 
 function shouldSeedGuideInteractionBehavior(specs: string[] = []) {
@@ -3842,18 +3226,6 @@ function isSubagentRuntimeCatalogReasoningSpec(specs: string[] = []) {
   return specs.some((spec) => spec.includes(SUBAGENT_RUNTIME_CATALOG_REASONING_SPEC));
 }
 
-function isOffPeakSubagentModelInheritanceSpec(specs: string[] = []) {
-  return specs.some((spec) => spec.includes(OFFPEAK_SUBAGENT_MODEL_INHERITANCE_SPEC));
-}
-
-function isOffPeakInvalidTicketSpec(specs: string[] = []) {
-  return specs.some((spec) => spec.includes(OFFPEAK_INVALID_TICKET_SPEC));
-}
-
-function isModelProviderPlanSurfaceSpec(specs: string[] = []) {
-  return specs.some((spec) => spec.includes(MODEL_PROVIDER_PLAN_SURFACE_SPEC));
-}
-
 function isToolErrorSurfaceSpec(specs: string[] = []) {
   return specs.some((spec) => spec.includes(TOOL_ERROR_SURFACE_SPEC));
 }
@@ -3861,12 +3233,7 @@ function isToolErrorSurfaceSpec(specs: string[] = []) {
 function seedE2EBuiltInSubagentModelOverrides(specs: string[] = []) {
   const builtInModelSelectionOverridesSpec = isBuiltInSubagentModelSelectionOverridesSpec(specs);
   const runtimeCatalogSpec = isSubagentRuntimeCatalogReasoningSpec(specs);
-  const offPeakSubagentModelInheritanceSpec = isOffPeakSubagentModelInheritanceSpec(specs);
-  if (
-    !builtInModelSelectionOverridesSpec &&
-    !runtimeCatalogSpec &&
-    !offPeakSubagentModelInheritanceSpec
-  ) {
+  if (!builtInModelSelectionOverridesSpec && !runtimeCatalogSpec) {
     return;
   }
 
@@ -3886,13 +3253,12 @@ function seedE2EBuiltInSubagentModelOverrides(specs: string[] = []) {
         providerId: E2E_PROVIDER_ALTERNATE_PROVIDER_ID,
         modelId: E2E_PROVIDER_SECONDARY_MODEL,
       };
-  const initialGeneralPurposeSelection =
-    runtimeCatalogSpec || offPeakSubagentModelInheritanceSpec
-      ? overrideSelection
-      : {
-          providerId: e2eProviderPreset.providerId,
-          modelId: e2eProviderPreset.model,
-        };
+  const initialGeneralPurposeSelection = runtimeCatalogSpec
+    ? overrideSelection
+    : {
+        providerId: e2eProviderPreset.providerId,
+        modelId: e2eProviderPreset.model,
+      };
   mkdirSync(E2E_APP_CONFIG_DIR, { recursive: true });
   writeFileSync(
     E2E_AGENTS_STATE_FILE,
@@ -4003,47 +3369,6 @@ You are the E2E provider registry reviewer. Reply only with the requested marker
     });
   }
 
-  if (isOffPeakSubagentModelInheritanceSpec(specs)) {
-    profileEntries.push(
-      {
-        name: "Code Search",
-        content: `---
-name: Code Search
-description: E2E custom foreground subagent with an explicit alternate provider model.
-model: custom:${E2E_PROVIDER_ALTERNATE_PROVIDER_ID}:${E2E_PROVIDER_SECONDARY_MODEL}
-tools: Read
-maxTurns: 1
----
-You are the E2E Code Search reviewer. Reply only with the requested marker.
-`,
-      },
-      {
-        name: "E2E OffPeak Inherit Reviewer",
-        content: `---
-name: E2E OffPeak Inherit Reviewer
-description: E2E custom foreground subagent that normally inherits the session model.
-tools: Read
-maxTurns: 1
----
-You are the E2E inherited-model reviewer. Reply only with the requested marker.
-`,
-      },
-      {
-        name: "E2E OffPeak Background Reviewer",
-        content: `---
-name: E2E OffPeak Background Reviewer
-description: E2E custom profile configured to run in the background.
-model: custom:${E2E_PROVIDER_ALTERNATE_PROVIDER_ID}:${E2E_PROVIDER_SECONDARY_MODEL}
-tools: Read
-background: true
-maxTurns: 1
----
-This E2E profile must be rejected before any provider request during an idle-plan turn.
-`,
-      },
-    );
-  }
-
   if (isToolErrorSurfaceSpec(specs)) {
     profileEntries.push(
       {
@@ -4107,9 +3432,9 @@ This child must fail before sending a provider request when the Team scope is un
 }
 
 async function seedUpstreamE2EModelConfig(specs: string[] = []) {
-  if (isOAuthCredentialRecoverySpec(specs) || usesProviderReadinessColdStartFixture(specs)) {
-    // Bugfix: OAuth 凭据恢复及 provider-readiness 冷启动 fixture 必须保持
-    // 无可用本地模型配置，避免默认 上游 回放 provider 绕过登录/执行门禁。
+  if (usesProviderReadinessColdStartFixture(specs)) {
+    // Bugfix: provider-readiness 冷启动 fixture 必须保持无可用本地模型配置，
+    // 避免默认上游回放 provider 绕过执行门禁。
     return;
   }
 
@@ -4146,10 +3471,8 @@ async function seedUpstreamE2EModelConfig(specs: string[] = []) {
   const exposeSubagentReasoningMetadata =
     builtInSubagentModelOverridesSpec ||
     settingsSubagentCreateEditPersistenceSpec ||
-    specs.some((spec) => spec.includes("plugin-subagent-override-cold.test.ts")) ||
-    isSubagentCodingPlanLoginCatalogStaleSpec(specs);
+    specs.some((spec) => spec.includes("plugin-subagent-override-cold.test.ts"));
   const subagentRuntimeCatalogReasoningSpec = isSubagentRuntimeCatalogReasoningSpec(specs);
-  const offPeakSubagentModelInheritanceSpec = isOffPeakSubagentModelInheritanceSpec(specs);
   const browserUseIabLifecycleSpec = specs.some(
     (spec) =>
       spec.includes("conversation-session-browser-use-iab-full-chain.test.ts") ||
@@ -4204,13 +3527,9 @@ async function seedUpstreamE2EModelConfig(specs: string[] = []) {
         // 与 model + reasoning effort 的目标语义无关。
         !builtInSubagentModelOverridesSpec &&
         !subagentRuntimeCatalogReasoningSpec &&
-        !offPeakSubagentModelInheritanceSpec &&
         // Z02 要验证 cold follow-up 仍投影原始 tool block；240/80 小窗口会先触发
         // auto compact 并合法替换历史，导致测试观察到另一条产品路径。
         !spec.includes("conversation-session-tool-input-validation-provider-content.test.ts") &&
-        // OP-CHAT-02 验证冷恢复旧会话仍有 OffPeakCreate 工具面并走完创建→卡片→编辑；
-        // 240/80 小窗口会在 tool_result 后插入 auto compact，与闲时任务语义无关。
-        !spec.includes("conversation-session-offpeak-create-existing-session.test.ts") &&
         // I70-I72 直接断言未经 compact 改写的 reasoning 历史投影与 signature retry；
         // 240-token 小窗口会在第二轮前合法替换历史，污染本 case 的 provider-visible 证据。
         !spec.includes("conversation-session-anthropic-reasoning-history-replay.test.ts") &&
@@ -4406,11 +3725,6 @@ async function seedUpstreamE2EModelConfig(specs: string[] = []) {
   await seedPersonalDefaultModelSelection(E2E_APP_PROVIDER_CONFIG_FILE, {
     providerId: e2eProviderPreset.providerId,
     modelId: e2eProviderPreset.model,
-    // OP10 新建 Session 使用默认选择而非未提交的 Composer 草稿；默认档位缺失
-    // 会令配置不完整，随后正确推荐账号模型，测不到普通轮的 上游 隔离断言。
-    ...(offPeakSubagentModelInheritanceSpec && readE2EThoughtLevel()
-      ? { options: { reasoningLevel: readE2EThoughtLevel() } }
-      : {}),
   });
 }
 
@@ -4631,27 +3945,6 @@ export const config: WebdriverIO.Config = {
             [CODING_PLAN_TEAM_MOCK_BASE_URL_ENV]: codingPlanTeamMockBaseUrl,
           });
         }
-        // Bugfix: Coding Plan webview origin 是 Vite 编译期常量；mock 必须先于
-        // build 启动并注入 env，否则 renderer 会 baked 线上官网 origin。
-        await startCodingPlanUpgradeE2EMock(configuredE2ESpecs, {
-          prepareForBuild: true,
-        });
-        const codingPlanUpgradeMockBaseUrl =
-          process.env[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim();
-        if (codingPlanUpgradeMockBaseUrl) {
-          // 正式 Rewards 用例使用自托管网页，不依赖开发者的 localhost:3000 服务。
-          if (configuredE2ESpecs.some((spec) => spec.includes("marketing-touch-rewards"))) {
-            process.env.VITE_REWARDS_WEBVIEW_ORIGIN = codingPlanUpgradeMockBaseUrl;
-          }
-          if (!config.runnerEnv) {
-            throw new Error(
-              "wdio config 缺少 runnerEnv，coding plan upgrade mock 端口无法透传给 worker",
-            );
-          }
-          Object.assign(config.runnerEnv, {
-            [CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]: codingPlanUpgradeMockBaseUrl,
-          });
-        }
         const buildAndStage = async () => {
           prepareDesktopAppBuild();
           if (!E2E_PACKAGED_APP_BINARY_PATH) await stageDesktopE2EAppOutput();
@@ -4693,7 +3986,6 @@ export const config: WebdriverIO.Config = {
     applyUpstreamE2EHttpModeForWorker(specs);
     applyAskUserQuestionClockScaleForWorker(specs);
     applyE2EProviderEnv(specs);
-    configureHighspeedE2EMock(specs);
     currentE2EBeforeSessionError = null;
     applyE2EWorkerModelRetryEnv(process.env, specs, configuredModelRetryMaxRetries);
     currentE2EChromiumUserDataDir = resolveE2EWorkerChromiumProfileDir(
@@ -4758,21 +4050,13 @@ export const config: WebdriverIO.Config = {
           recordBeforeSession: e2eReporter.beforeSession,
           resetHome: resetE2EHome,
           startCodingPlanTeamMockIfNeeded,
-          startCodingPlanUpgradeMockIfNeeded: startCodingPlanUpgradeE2EMock,
           startUpstreamHttpIfNeeded: startUpstreamE2EHttp,
           startPluginCdnZipFixtureIfNeeded,
-          startOffPeakMockIfNeeded: startOffPeakE2EMock,
         });
         // Client Scenes 是布局 case 的远端目录依赖；必须在 resetHome 完成、Electron
         // 启动前覆盖 endpoint，确保 Main → Host 首次 import 时拿到 case-local fixture。
         await startClientScenesE2EMockIfNeeded(specs);
         await startRequestSecurityFixture(specs, E2E_HOME_DIR);
-        stopOAuthCompletionRaceFixture = await prepareOAuthCompletionRaceFixture(specs);
-        stopAccessToken401Fixture = await prepareAccessToken401Fixture({
-          specs,
-          credentialsFile: E2E_APP_CREDENTIALS_FILE,
-          settingsFile: E2E_APP_SETTINGS_FILE,
-        });
         // resetHome 之后、Electron 启动之前安装，Main -> Host -> Agent 才会同时继承
         // case-owned PATH；其他 spec 由 helper 保持 no-op。
         await installBashPrefixPermissionPnpmShim({
@@ -4855,11 +4139,8 @@ export const config: WebdriverIO.Config = {
           await stopRequestSecurityFixture();
           await stopModelContextBudgetConfigE2EMock();
           await stopDynamicWorkflowConfigE2EMock();
+          await stopClientScenesE2EMock();
           currentE2EElectronAppPid = null;
-          await stopOAuthCompletionRaceFixture?.();
-          stopOAuthCompletionRaceFixture = null;
-          await stopAccessToken401Fixture?.();
-          stopAccessToken401Fixture = null;
           currentE2EBeforeSessionError = null;
           e2eFailureArtifacts = null;
           currentE2EWorkerSessionSpecs = [];
@@ -4931,15 +4212,9 @@ export const config: WebdriverIO.Config = {
         try {
           await stopUpstreamE2EHttp();
           await stopCodingPlanTeamMock();
-          await stopCodingPlanUpgradeE2EMock();
           await stopRequestSecurityFixture();
           await stopModelContextBudgetConfigE2EMock();
           await stopDynamicWorkflowConfigE2EMock();
-          await stopClientScenesE2EMock();
-          await stopOAuthCompletionRaceFixture?.();
-          stopOAuthCompletionRaceFixture = null;
-          await stopAccessToken401Fixture?.();
-          stopAccessToken401Fixture = null;
           await stopPluginCdnZipFixture();
         } finally {
           await cleanupE2EElectronProcesses("onComplete");

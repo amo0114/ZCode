@@ -206,33 +206,21 @@ function createProvider(
 }
 
 describe("ProviderModelsSection compact model rows", () => {
-  it.each(["individual-coding-plan", "team-coding-plan", "start-plan", "manual", "standard"])(
-    "设置页共享视觉标判断，连接=%s",
-    (mode) => {
-      const provider = createProvider();
-      provider.config.access =
-        mode === "manual"
-          ? { type: "zhipu-coding-plan-api-key", apiKey: "fixture" }
-          : mode === "standard"
-            ? { type: "api-key", apiKey: "fixture" }
-            : {
-                type: "zhipu-account",
-                accountType: "bigmodel",
-                mode: mode as "individual-coding-plan" | "team-coding-plan" | "start-plan",
-              };
-      provider.models = ["GLM-5.3", "GLM-5.3-Flash"].map((id) => {
-        const model = createModelProviderModelConfig({ id });
-        model.config.properties!.inputFormat = {
-          ...model.config.properties?.inputFormat,
-          supportsImage: true,
-        };
-        return model;
-      });
-      render(createElement(InlineEditableProviderCard, { provider, onSave: vi.fn() }));
-      expect(screen.getAllByText("视觉")).toHaveLength(mode === "standard" ? 2 : 1);
-      expect(provider.models[0]!.config.properties?.inputFormat?.supportsImage).toBe(true);
-    },
-  );
+  it("支持图片输入的模型行显示视觉标", () => {
+    const provider = createProvider();
+    provider.config.access = { type: "api-key", apiKey: "fixture" };
+    provider.models = ["GLM-5.3", "GLM-5.3-Flash"].map((id) => {
+      const model = createModelProviderModelConfig({ id });
+      model.config.properties!.inputFormat = {
+        ...model.config.properties?.inputFormat,
+        supportsImage: true,
+      };
+      return model;
+    });
+    render(createElement(InlineEditableProviderCard, { provider, onSave: vi.fn() }));
+    expect(screen.getAllByText("视觉")).toHaveLength(2);
+    expect(provider.models[0]!.config.properties?.inputFormat?.supportsImage).toBe(true);
+  });
   it("切换 Provider 时相同模型 ID 也不能复用上一个 Provider 的编辑事务", async () => {
     const initial = createProvider();
     const view = render(

@@ -6,7 +6,6 @@ import {
   apiKeyAccessDataSchema,
   personalProviderApiDataSchema,
   providerConfigDataSchema,
-  providerGroupDataSchema,
   providerTemplateDataSchema,
 } from "./provider-data-schema.js";
 
@@ -101,26 +100,13 @@ export const providerTemplateConfigRuleSchema = providerTemplateDataSchema.exten
     }),
 });
 export const builtinProviderConfigRuleSchema = providerConfigRuleSchema.extend({
-  config: providerConfigDataSchema.omit({ personalModelIds: true, modelOrder: true }).extend({
-    group: providerGroupDataSchema.exclude(["standard-personal"]),
+  config: providerConfigDataSchema.omit({ personalModelIds: true, modelOrder: true }),
+});
+export const personalProviderConfigRuleSchema = providerConfigRuleSchema.extend({
+  config: providerConfigDataSchema.omit({ builtinModelIds: true }).extend({
+    api: personalProviderApiDataSchema.nullable().optional(),
   }),
 });
-export const personalProviderConfigRuleSchema = providerConfigRuleSchema
-  .extend({
-    config: providerConfigDataSchema.omit({ builtinModelIds: true }).extend({
-      group: providerGroupDataSchema.extract(["standard-personal"]).nullable().optional(),
-      api: personalProviderApiDataSchema.nullable().optional(),
-    }),
-  })
-  .superRefine((rule, context) => {
-    if (rule.providerId.startsWith("account:") && rule.config.access !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["config", "access"],
-        message: "固定 Account Provider 的 Access 只能由 ZCode Built-in Config 声明",
-      });
-    }
-  });
 export const builtinProviderConfigRulesSchema = z
   .object({
     templateRules: z.array(providerTemplateConfigRuleSchema),

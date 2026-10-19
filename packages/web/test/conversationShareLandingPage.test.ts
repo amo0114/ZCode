@@ -257,36 +257,32 @@ describe("ConversationShareLandingPage", () => {
     expect(html).toContain('data-share-continue-visible="false"');
   });
 
-  it("renders private login-required status without exposing API details", () => {
+  it("renders login-required status as unavailable without exposing API details", () => {
     const html = renderToStaticMarkup(
       createElement(ConversationShareLandingStatus, {
         state: { kind: "login_required" },
         locale: "en-US",
       }),
     );
-    expect(html).toContain("Sign in to view this share");
+    expect(html).toContain("Share unavailable");
     expect(html).not.toContain("3211");
   });
 
   it.each([
-    ["zh-CN", "账号数据不互通", "回到首页"],
-    ["en-US", "do not share account data", "Back to home"],
-  ] as const)(
-    "offers account guidance and home navigation for not_found in %s",
-    (locale, hint, home) => {
-      const html = renderToStaticMarkup(
-        createElement(ConversationShareLandingStatus, {
-          state: { kind: "error", error: "not_found" },
-          locale,
-          onRetry: () => {},
-        }),
-      );
-      expect(html).toContain(hint);
-      expect(html).toContain(home);
-      expect(html).toContain('href="https://zcode.z.ai"');
-      expect(html).not.toContain('target="_blank"');
-    },
-  );
+    ["zh-CN", "回到首页"],
+    ["en-US", "Back to home"],
+  ] as const)("offers home navigation for not_found in %s", (locale, home) => {
+    const html = renderToStaticMarkup(
+      createElement(ConversationShareLandingStatus, {
+        state: { kind: "error", error: "not_found" },
+        locale,
+        onRetry: () => {},
+      }),
+    );
+    expect(html).toContain(home);
+    expect(html).toContain('href="https://zcode.z.ai"');
+    expect(html).not.toContain('target="_blank"');
+  });
 
   it.each([
     "network",
@@ -296,7 +292,7 @@ describe("ConversationShareLandingPage", () => {
     "unsupported_schema_version",
     "rate_limited",
     "unknown",
-  ] as const)("keeps account guidance and home navigation out of %s", (error) => {
+  ] as const)("keeps home navigation out of %s", (error) => {
     const html = renderToStaticMarkup(
       createElement(ConversationShareLandingStatus, {
         state: { kind: "error", error },
@@ -304,7 +300,6 @@ describe("ConversationShareLandingPage", () => {
         onRetry: () => {},
       }),
     );
-    expect(html).not.toContain("账号数据不互通");
     expect(html).not.toContain("回到首页");
   });
 });

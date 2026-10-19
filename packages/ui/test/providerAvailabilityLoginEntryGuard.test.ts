@@ -10,7 +10,6 @@ describe("useProviderAvailabilityLoginEntryGuard", () => {
       useProviderAvailabilityLoginEntryGuard({
         user: null,
         isRestoringOAuthSession: false,
-        providerFamilyDomain: "zai",
         modelSelectionView: null,
         modelSelectionError: new Error("registry unavailable"),
         refreshProviderState: vi.fn(async () => {}),
@@ -41,7 +40,6 @@ describe("useProviderAvailabilityLoginEntryGuard", () => {
         useProviderAvailabilityLoginEntryGuard({
           user: null,
           isRestoringOAuthSession: false,
-          providerFamilyDomain: "zai",
           modelSelectionView: props.hydrated ? view : null,
           refreshProviderState,
           readModelSelectionView: async () => view,

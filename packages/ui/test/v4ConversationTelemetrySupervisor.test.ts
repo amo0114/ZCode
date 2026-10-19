@@ -312,162 +312,6 @@ describe("ConversationTelemetrySupervisor", () => {
     },
   );
 
-  it.each(["zai", "bigmodel"])(
-    "%s 新旧身份在实际请求换模后的完成/step 上报对齐",
-    async (family) => {
-      const run = async (modern: boolean) => {
-        resetMessageTelemetryForTest();
-        const { platform, reportTelemetryEvent, reportArmsCustomEvent } = createPlatform();
-        // perf_ui_* 走模块级 reporter，与 plan_* 直接经 platform 上报不同，需显式挂载才能观察到。
-        setUiPerfArmsReporter(platform);
-        let now = 100;
-        const supervisor = new ConversationTelemetrySupervisor({
-          platform,
-          workspaceScopeKey: "compat-workspace",
-          now: () => now,
-        });
-        const detach = supervisor.attachForeground({}, "session-1");
-        const team = modern
-          ? `account:${family}-team-coding-plan`
-          : `builtin:${family}-coding-plan`;
-        const start = modern ? `account:${family}-start-plan` : `builtin:${family}-start-plan`;
-        supervisor.acceptPromptSeed({
-          sessionId: "session-1",
-          sourceCommandId: "command-1",
-          sendTime: now,
-          extraDetail: buildV4ConversationPromptTelemetryExtraDetail({
-            configProvider: team,
-            modelName: "GLM-5.3",
-            providerBaseURL: "https://example.com/api",
-            planIdentitySnapshot: {
-              generatedAt: 1,
-              planStatus: "coding_plan",
-              planProductId: "team",
-            },
-          }),
-        });
-        supervisor.handleFact({
-          ...commonFact("start", 1),
-          kind: "turn.started",
-          executionKind: "agent",
-        });
-        let seq = 2;
-        for (const providerId of [team, start]) {
-          now += 10;
-          const requestId = `request-${seq}`;
-          const fact = Object.freeze({
-            // plan_request 按 eventId 在模块级去重且跨用例保留；family/run 前缀保证每轮都能观察到上报。
-            ...commonFact(`${family}-${modern ? "modern" : "legacy"}-request-${seq}`, seq++),
-            kind: "model.request.status" as const,
-            requestId,
-            status: "model_request_started" as const,
-            providerId,
-            modelId: "GLM-5.3",
-            providerHostname: "example.com",
-            transport: "fetch" as const,
-            querySource: "build",
-            attempt: 1,
-            maxAttempts: 1,
-          });
-          supervisor.handleFact(fact);
-          expect(fact.providerId).toBe(providerId);
-          supervisor.handleFact({
-            ...commonFact(`chunk-${seq}`, seq++),
-            kind: "stream.chunk",
-            channel: "text",
-            chunkLength: 5,
-            firstChunk: true,
-          });
-          supervisor.handleFact({
-            ...commonFact(`usage-${seq}`, seq++),
-            kind: "usage.delta",
-            requestId,
-            providerId,
-            modelId: "GLM-5.3",
-            providerHostname: "example.com",
-            inputTokens: 10,
-            outputTokens: 5,
-            totalTokens: 15,
-          });
-          supervisor.handleFact({
-            ...commonFact(`tool-${seq}`, seq++),
-            kind: "tool.lifecycle",
-            phase: "started",
-            toolCallId: requestId,
-            toolName: "Read",
-          });
-          supervisor.handleFact({
-            ...commonFact(`end-${seq}`, seq++),
-            kind: "tool.lifecycle",
-            phase: "completed",
-            toolCallId: requestId,
-            toolName: "Read",
-          });
-        }
-        now += 10;
-        const terminal = {
-          ...commonFact("terminal", seq++),
-          kind: "turn.terminal" as const,
-          status: "success" as const,
-          resultType: "complete" as const,
-        };
-        supervisor.handleFact(terminal);
-        supervisor.handleFact(terminal);
-        await supervisor.flushReportsForTest();
-        const reports = reportTelemetryEvent.mock.calls.map(([payload]) => ({
-          element: payload.elementName,
-          talkId: payload.talkId,
-          messageId: payload.messageId,
-          // step_id 是每次采集随机生成值，不是统计维度；其他字段完整成对比较。
-          detail: Object.fromEntries(
-            Object.entries(payload.eventExtraDetail).filter(([key]) => key !== "step_id"),
-          ),
-        }));
-        expect(reports.filter((event) => event.element === "message_completion")).toHaveLength(1);
-        expect(
-          reports.find((event) => event.element === "message_completion")?.detail,
-        ).toMatchObject({
-          model_provider: `builtin:${family}-start-plan`,
-          model_name: `builtin:${family}-start-plan/GLM-5.3`,
-          input_tokens: "20",
-          output_tokens: "10",
-        });
-        expect(
-          reports
-            .filter((event) => event.element === "agent_step")
-            .map((event) => event.detail.model_provider),
-        ).toEqual(
-          expect.arrayContaining([`builtin:${family}-coding-plan`, `builtin:${family}-start-plan`]),
-        );
-        // ARMS 侧复用同一份 legacy detail：内置 provider 的旧报表身份必须保留、模型按白名单规范化，
-        // 否则内置用户在 plan_ttft / perf_ui_* 看板里会整体落入 custom。
-        expect(armsByName(reportArmsCustomEvent, "plan_ttft")[0]?.properties).toMatchObject({
-          provider_id: `builtin:${family}-start-plan`,
-          provider_scope: "builtin",
-          model_name: "glm-5.3",
-        });
-        expect(armsByName(reportArmsCustomEvent, "perf_ui_first_token")[0]?.properties?.model).toBe(
-          "glm-5.3",
-        );
-        // plan_request 直接使用协议事件里的 provider（account:* 或旧 builtin:*），两种命名空间都应保留。
-        const planRequests = armsByName(reportArmsCustomEvent, "plan_request");
-        expect(planRequests.map((payload) => payload.properties?.provider_id)).toEqual([
-          team,
-          start,
-        ]);
-        for (const payload of planRequests) {
-          expect(payload.properties).toMatchObject({
-            provider_scope: "builtin",
-            model_name: "glm-5.3",
-          });
-        }
-        detach();
-        supervisor.dispose();
-        return reports;
-      };
-      expect(await run(true)).toEqual(await run(false));
-    },
-  );
   beforeEach(() => {
     resetMessageTelemetryForTest();
     clearUiPerfArmsReporterForTest();
@@ -486,11 +330,6 @@ describe("ConversationTelemetrySupervisor", () => {
         modelName: "custom-model",
         askMode: "plan",
         providerBaseURL: "https://api.example.com/v1/messages?token=secret",
-        planIdentitySnapshot: {
-          generatedAt: 123,
-          planStatus: "coding_plan",
-          planProductId: "product-1",
-        },
       }),
     ).toEqual({
       ask_mode: "plan",
@@ -498,8 +337,6 @@ describe("ConversationTelemetrySupervisor", () => {
       model_provider: "custom-provider-id",
       provider_name: "api.example.com",
       agent: "glm",
-      plan_status: "coding_plan",
-      plan_product_id: "product-1",
       message_source: "chat",
       task_trigger: "",
     });
@@ -544,8 +381,6 @@ describe("ConversationTelemetrySupervisor", () => {
         model_name: "seed-model",
         model_provider: "seed-provider",
         agent: "glm",
-        plan_status: "unknown",
-        plan_product_id: "",
       },
     });
 
@@ -562,8 +397,6 @@ describe("ConversationTelemetrySupervisor", () => {
         model_name: "seed-model",
         model_provider: "seed-provider",
         agent: "glm",
-        plan_status: "unknown",
-        plan_product_id: "",
         input_start_time: "100",
         input_first_char_time: "120",
         input_send_time: "200",
@@ -731,8 +564,6 @@ describe("ConversationTelemetrySupervisor", () => {
         model_provider: "runtime-provider",
         provider_name: "runtime.example.com",
         agent: "glm",
-        plan_status: "unknown",
-        plan_product_id: "",
         input_tokens: "10",
         output_tokens: "5",
         reasoning_tokens: "3",
@@ -896,12 +727,7 @@ describe("ConversationTelemetrySupervisor", () => {
 
   it.each([
     ["main-provider", "child-provider", "main-provider", "child-provider"],
-    [
-      "account:bigmodel-team-coding-plan",
-      "account:zai-start-plan",
-      "builtin:bigmodel-coding-plan",
-      "builtin:zai-start-plan",
-    ],
+    ["bigmodel-api", "zai-api", "builtin:bigmodel", "builtin:zai"],
   ])(
     "主模型 %s、前台 Subagent %s、后续主模型分别保留 usage 与旧统计身份",
     async (mainId, childId, mainReportId, childReportId) => {
@@ -3049,246 +2875,6 @@ describe("ConversationTelemetrySupervisor", () => {
     )?.eventExtraDetail;
     expect(chatCompletion).toMatchObject({ message_source: "chat", task_trigger: "" });
     expect(chatCompletion).not.toHaveProperty("automation_id");
-    supervisor.dispose();
-  });
-
-  it("Off-Peak first/resume/retry talk 共用 task 归因，manual 不继承且每轮 message_id 独立", async () => {
-    const { platform, reportTelemetryEvent } = createPlatform();
-    const supervisor = new ConversationTelemetrySupervisor({
-      platform,
-      workspaceScopeKey: "scope-off-peak",
-      now: () => 2_000,
-    });
-    let eventSeq = 0;
-    const runOffPeakTurn = (params: {
-      sessionId: string;
-      sourceCommandId: string;
-      turnId: string;
-      offPeakRunType: "init" | "resume";
-    }) => {
-      const base = {
-        version: 1 as const,
-        occurredAt: 1_000 + eventSeq,
-        sessionId: params.sessionId,
-        sourceCommandId: params.sourceCommandId,
-        turnId: params.turnId,
-      };
-      supervisor.handleFact({
-        ...base,
-        eventId: `${params.sourceCommandId}-start`,
-        eventSeq: eventSeq++,
-        kind: "turn.started",
-        offPeakTaskId: "offpeak-stable-1",
-        offPeakRunType: params.offPeakRunType,
-      });
-      supervisor.handleFact({
-        ...base,
-        eventId: `${params.sourceCommandId}-model`,
-        eventSeq: eventSeq++,
-        kind: "model.request.status",
-        requestId: `${params.sourceCommandId}-request`,
-        status: "model_request_started",
-        providerId: "runtime-provider",
-        modelId: "runtime-model",
-        providerHostname: "api.example.com",
-        transport: "fetch",
-        attempt: 1,
-        maxAttempts: 1,
-      });
-      supervisor.handleFact({
-        ...base,
-        eventId: `${params.sourceCommandId}-chunk`,
-        eventSeq: eventSeq++,
-        kind: "stream.chunk",
-        channel: "text",
-        chunkLength: 1,
-        firstChunk: true,
-      });
-      const terminal = {
-        ...base,
-        eventId: `${params.sourceCommandId}-terminal`,
-        eventSeq: eventSeq++,
-        kind: "turn.terminal",
-        status: "success",
-      } satisfies ConversationTelemetryFact;
-      supervisor.handleFact(terminal);
-      supervisor.handleFact({
-        ...terminal,
-        eventId: `${params.sourceCommandId}-terminal-duplicate`,
-        eventSeq: eventSeq++,
-      });
-    };
-
-    runOffPeakTurn({
-      sessionId: "talk-first",
-      sourceCommandId: "message-first",
-      turnId: "turn-first",
-      offPeakRunType: "init",
-    });
-    runOffPeakTurn({
-      sessionId: "talk-first",
-      sourceCommandId: "message-resume",
-      turnId: "turn-resume",
-      offPeakRunType: "resume",
-    });
-    runOffPeakTurn({
-      sessionId: "talk-retry",
-      sourceCommandId: "message-retry",
-      turnId: "turn-retry",
-      offPeakRunType: "init",
-    });
-
-    supervisor.acceptPromptSeed({
-      sessionId: "talk-first",
-      sourceCommandId: "message-manual",
-      sendTime: 1_500,
-      extraDetail: {
-        message_source: "chat",
-        task_trigger: "",
-        model_name: "manual-seed",
-        model_provider: "manual-provider",
-      },
-    });
-    supervisor.handleFact({
-      ...commonFact("manual-start", eventSeq++, "talk-first"),
-      sourceCommandId: "message-manual",
-      turnId: "turn-manual",
-      kind: "turn.started",
-    });
-    supervisor.handleFact({
-      ...commonFact("manual-chunk", eventSeq++, "talk-first"),
-      sourceCommandId: "message-manual",
-      turnId: "turn-manual",
-      kind: "stream.chunk",
-      channel: "text",
-      chunkLength: 1,
-      firstChunk: true,
-    });
-    supervisor.handleFact({
-      ...commonFact("manual-terminal", eventSeq++, "talk-first"),
-      sourceCommandId: "message-manual",
-      turnId: "turn-manual",
-      kind: "turn.terminal",
-      status: "success",
-    });
-    await supervisor.flushReportsForTest();
-
-    expect(reportsByElement(reportTelemetryEvent, "send_btn")).toHaveLength(1);
-    const completions = reportsByElement(reportTelemetryEvent, "message_completion");
-    const steps = reportsByElement(reportTelemetryEvent, "agent_step");
-    expect(completions).toHaveLength(4);
-    for (const [messageId, offPeakRunType] of [
-      ["message-first", "init"],
-      ["message-resume", "resume"],
-      ["message-retry", "init"],
-    ] as const) {
-      const detail = completions.find(
-        (payload) => payload.messageId === messageId,
-      )?.eventExtraDetail;
-      expect(detail).toMatchObject({
-        message_source: "off_peak_task",
-        off_peak_task_id: "offpeak-stable-1",
-        off_peak_run_type: offPeakRunType,
-        model_name: "runtime-provider/runtime-model",
-        model_provider: "runtime-provider",
-      });
-      expect(detail).not.toHaveProperty("automation_id");
-      expect(detail).not.toHaveProperty("task_trigger");
-      expect(
-        steps.find((payload) => payload.messageId === messageId)?.eventExtraDetail,
-      ).toMatchObject({
-        message_source: "off_peak_task",
-        off_peak_task_id: "offpeak-stable-1",
-        off_peak_run_type: offPeakRunType,
-      });
-    }
-    expect(completions.find((payload) => payload.messageId === "message-retry")?.talkId).toBe(
-      "talk-retry",
-    );
-    const manual = completions.find(
-      (payload) => payload.messageId === "message-manual",
-    )?.eventExtraDetail;
-    expect(manual).toMatchObject({ message_source: "chat" });
-    expect(manual).not.toHaveProperty("off_peak_task_id");
-    expect(manual).not.toHaveProperty("off_peak_run_type");
-    const manualStep = steps.find(
-      (payload) => payload.messageId === "message-manual",
-    )?.eventExtraDetail;
-    expect(manualStep).not.toHaveProperty("off_peak_task_id");
-    expect(manualStep).not.toHaveProperty("off_peak_run_type");
-    supervisor.dispose();
-  });
-
-  it("Off-Peak usage fact 去重后 completion 保留精确总量，step 保持占位口径", async () => {
-    const { platform, reportTelemetryEvent } = createPlatform();
-    const supervisor = new ConversationTelemetrySupervisor({
-      platform,
-      workspaceScopeKey: "scope-off-peak-usage",
-      now: () => 2_000,
-    });
-    const base = {
-      version: 1 as const,
-      occurredAt: 1_000,
-      sessionId: "talk-usage",
-      sourceCommandId: "message-usage",
-      turnId: "turn-usage",
-    };
-    supervisor.handleFact({
-      ...base,
-      eventId: "usage-start",
-      eventSeq: 1,
-      kind: "turn.started",
-      offPeakTaskId: "offpeak-usage",
-    });
-    const usage = {
-      ...base,
-      eventId: "usage-once",
-      eventSeq: 2,
-      kind: "usage.delta",
-      inputTokens: 10,
-      outputTokens: 5,
-      totalTokens: 18,
-      reasoningTokens: 3,
-      cacheReadTokens: 2,
-      cacheWriteTokens: 1,
-    } satisfies ConversationTelemetryFact;
-    supervisor.handleFact(usage);
-    supervisor.handleFact(usage);
-    supervisor.handleFact({
-      ...base,
-      eventId: "usage-chunk",
-      eventSeq: 3,
-      kind: "stream.chunk",
-      channel: "text",
-      chunkLength: 1,
-      firstChunk: true,
-    });
-    supervisor.handleFact({
-      ...base,
-      eventId: "usage-terminal",
-      eventSeq: 4,
-      kind: "turn.terminal",
-      status: "success",
-    });
-    await supervisor.flushReportsForTest();
-
-    expect(
-      reportsByElement(reportTelemetryEvent, "message_completion")[0]?.eventExtraDetail,
-    ).toMatchObject({
-      input_tokens: "10",
-      output_tokens: "5",
-      reasoning_tokens: "3",
-      total_tokens: "18",
-      off_peak_task_id: "offpeak-usage",
-    });
-    expect(reportsByElement(reportTelemetryEvent, "agent_step")[0]?.eventExtraDetail).toMatchObject(
-      {
-        input_tokens: "0",
-        output_tokens: "0",
-        cached_tokens: "0",
-        off_peak_task_id: "offpeak-usage",
-      },
-    );
     supervisor.dispose();
   });
 

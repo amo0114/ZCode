@@ -1,37 +1,26 @@
-import { BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID, type ApiClient } from "@zcode/shared";
-import type { OAuthRuntimeConfig } from "../runtimeConfig.js";
-import { BigModelProviderAdapter } from "./bigmodelProviderAdapter.js";
+import type { OAuthProviderId } from "@zcode/shared";
+import type { OAuthProviderRuntimeConfig, OAuthRuntimeConfig } from "../runtimeConfig.js";
 import type { OAuthProviderAdapter } from "./providerAdapter.js";
-import { ZaiProviderAdapter } from "./zaiProviderAdapter.js";
 
-/** 根据运行时配置创建可用 provider adapter */
-export function createOAuthProviderAdapters(
-  config: OAuthRuntimeConfig,
-  options: { apiClient?: ApiClient } = {},
-): OAuthProviderAdapter[] {
-  const adapters: OAuthProviderAdapter[] = [];
-  const apiClient = options.apiClient;
-  if (!apiClient) {
-    throw new Error(
-      "ApiClient 注入缺失：OAuth provider adapters 必须通过 Providers 传入 apiClient",
-    );
-  }
+type OAuthProviderAdapterFactory = (
+  config: OAuthProviderRuntimeConfig,
+) => OAuthProviderAdapter;
 
-  for (const providerConfig of config.providers) {
-    switch (providerConfig.id) {
-      case BIGMODEL_PROVIDER_ID:
-        adapters.push(new BigModelProviderAdapter(providerConfig, apiClient));
-        break;
-      case ZAI_PROVIDER_ID:
-        adapters.push(new ZaiProviderAdapter(providerConfig, apiClient));
-        break;
-      default:
-        // 未知 provider 直接忽略，避免单个配置错误拖垮全部登录能力。
-        break;
-    }
-  }
+/**
+ * 生产登录渠道注册表，当前为空。接入新渠道见 `auth-session/CONTRACT.md`「新渠道接入清单」。
+ */
+const OAUTH_PROVIDER_ADAPTER_FACTORIES: Readonly<Record<string, OAuthProviderAdapterFactory>> = {};
 
-  return adapters;
+export const REGISTERED_OAUTH_PROVIDER_IDS: readonly OAuthProviderId[] = Object.keys(
+  OAUTH_PROVIDER_ADAPTER_FACTORIES,
+);
+
+/** 根据运行时配置创建可用 provider adapter；未注册的渠道配置直接忽略。 */
+export function createOAuthProviderAdapters(config: OAuthRuntimeConfig): OAuthProviderAdapter[] {
+  return config.providers.flatMap((providerConfig) => {
+    const factory = OAUTH_PROVIDER_ADAPTER_FACTORIES[providerConfig.id];
+    return factory ? [factory(providerConfig)] : [];
+  });
 }
 
 export type { OAuthProviderAdapter, OAuthProviderContext } from "./providerAdapter.js";

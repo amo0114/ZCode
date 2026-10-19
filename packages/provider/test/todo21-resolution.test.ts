@@ -95,7 +95,6 @@ function resolve(input: {
         }),
       ],
     ]),
-    accountProviders: ProviderConfigMap.empty(),
     personalProviders: new ProviderConfigMap([
       [
         "provider-a",

@@ -61,66 +61,56 @@ after(async () => {
 });
 
 for (const mobile of [false, true])
-  for (const theme of ["light", "dark"])
-    for (const highspeed of [false, true]) {
-      test(`HK08/HK11 ${mobile ? "mobile" : "desktop"}/${theme}/${highspeed ? "highspeed-no-text" : "normal"}`, async () => {
-        const page = await browser.newPage({
-          viewport: { width: mobile ? 390 : 1200, height: 800 },
-          isMobile: mobile,
-          hasTouch: mobile,
-        });
-        const errors = [];
-        page.on("pageerror", (error) => errors.push(String(error)));
-        const prefix = `${mobile ? "mobile" : "desktop"}-${theme}-${highspeed ? "highspeed-no-text" : "normal"}`;
-        try {
-          await page.goto(
-            `${origin}fixture?mobile=${mobile}&theme=${theme}&highspeed=${highspeed}`,
-          );
-          const turn = page.locator('[data-turn-id="hook-footer"]');
-          await turn.waitFor();
-          const hook = turn.getByTestId("v4-hook-details-trigger-hook-footer");
-          assert.equal(await hook.count(), 1, "同一轮必须恰好一个 Hook 入口");
-          assert.equal(
-            await turn.locator('[data-highspeed-output-footer="true"]').count(),
-            Number(highspeed),
-          );
-          assert.equal(await turn.getByTestId("v4-copy-4").count(), Number(!highspeed));
-          if (!mobile) await turn.hover();
-          await hook.waitFor({ state: "visible" });
-          await hook.evaluate(async (element) => {
-            await Promise.all(
-              element.parentElement
-                .getAnimations({ subtree: true })
-                .map((animation) => animation.finished),
-            );
-          });
-          if (mobile)
-            assert.equal(
-              await hook.evaluate((e) => getComputedStyle(e.parentElement).opacity),
-              "1",
-            );
-          await page.screenshot({ path: join(artifacts, `${prefix}-footer.png`) });
-          await hook.click();
-          const details = page.getByTestId("v4-hook-details-content-hook-footer");
-          await details.waitFor({ state: "visible" });
-          await details.evaluate(async (element) => {
-            await Promise.all(
-              element.getAnimations({ subtree: true }).map((animation) => animation.finished),
-            );
-          });
-          assert.equal(await details.locator("li").count(), 1);
-          assert.match(await details.innerText(), /UserPromptSubmit/);
-          assert.match(await details.innerText(), mobile ? /User/ : /用户/);
-          const bounds = await details.boundingBox();
-          assert.ok(bounds.x >= 8 && bounds.y >= 8);
-          assert.ok(bounds.x + bounds.width <= (mobile ? 390 : 1200) - 8);
-          assert.ok(bounds.y + bounds.height <= 800 - 8);
-          await page.screenshot({ path: join(artifacts, `${prefix}-details.png`) });
-          await page.keyboard.press("Escape");
-          await details.waitFor({ state: "hidden" });
-          assert.deepEqual(errors, []);
-        } finally {
-          await page.close();
-        }
+  for (const theme of ["light", "dark"]) {
+    test(`HK08/HK11 ${mobile ? "mobile" : "desktop"}/${theme}`, async () => {
+      const page = await browser.newPage({
+        viewport: { width: mobile ? 390 : 1200, height: 800 },
+        isMobile: mobile,
+        hasTouch: mobile,
       });
-    }
+      const errors = [];
+      page.on("pageerror", (error) => errors.push(String(error)));
+      const prefix = `${mobile ? "mobile" : "desktop"}-${theme}`;
+      try {
+        await page.goto(`${origin}fixture?mobile=${mobile}&theme=${theme}`);
+        const turn = page.locator('[data-turn-id="hook-footer"]');
+        await turn.waitFor();
+        const hook = turn.getByTestId("v4-hook-details-trigger-hook-footer");
+        assert.equal(await hook.count(), 1, "同一轮必须恰好一个 Hook 入口");
+        assert.equal(await turn.getByTestId("v4-copy-4").count(), 1);
+        if (!mobile) await turn.hover();
+        await hook.waitFor({ state: "visible" });
+        await hook.evaluate(async (element) => {
+          await Promise.all(
+            element.parentElement
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished),
+          );
+        });
+        if (mobile)
+          assert.equal(await hook.evaluate((e) => getComputedStyle(e.parentElement).opacity), "1");
+        await page.screenshot({ path: join(artifacts, `${prefix}-footer.png`) });
+        await hook.click();
+        const details = page.getByTestId("v4-hook-details-content-hook-footer");
+        await details.waitFor({ state: "visible" });
+        await details.evaluate(async (element) => {
+          await Promise.all(
+            element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+          );
+        });
+        assert.equal(await details.locator("li").count(), 1);
+        assert.match(await details.innerText(), /UserPromptSubmit/);
+        assert.match(await details.innerText(), mobile ? /User/ : /用户/);
+        const bounds = await details.boundingBox();
+        assert.ok(bounds.x >= 8 && bounds.y >= 8);
+        assert.ok(bounds.x + bounds.width <= (mobile ? 390 : 1200) - 8);
+        assert.ok(bounds.y + bounds.height <= 800 - 8);
+        await page.screenshot({ path: join(artifacts, `${prefix}-details.png`) });
+        await page.keyboard.press("Escape");
+        await details.waitFor({ state: "hidden" });
+        assert.deepEqual(errors, []);
+      } finally {
+        await page.close();
+      }
+    });
+  }

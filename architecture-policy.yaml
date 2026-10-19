@@ -123,6 +123,18 @@ modules:
     layers:
       app: "."
     owner: plugin
+  - id: auth-session
+    roots: [packages/services/src/auth-session]
+    managed: true
+    requires: [services, shared]
+    publicEntrypoints:
+      [
+        packages/services/src/auth-session/contract.ts,
+        packages/services/src/auth-session/authSessionReader.ts,
+      ]
+    layers:
+      app: "."
+    owner: desktop-settings
   - id: plugin-ui-bridge
     roots: [packages/services/src/plugin-ui-bridge]
     managed: true

@@ -667,8 +667,6 @@ describe("messageTelemetry", () => {
       model_name: "model-native",
       model_provider: "claude",
       agent: "claude",
-      plan_status: "unknown",
-      plan_product_id: "",
     });
 
     expect(
@@ -683,8 +681,6 @@ describe("messageTelemetry", () => {
       model_name: "model-custom",
       model_provider: "provider-a",
       agent: "claude",
-      plan_status: "unknown",
-      plan_product_id: "",
     });
 
     expect(
@@ -699,48 +695,6 @@ describe("messageTelemetry", () => {
       model_name: "model-ghost",
       model_provider: "gemini",
       agent: "gemini",
-      plan_status: "unknown",
-      plan_product_id: "",
-    });
-  });
-
-  it("freezes plan identity fields from send button into message completion", () => {
-    const sendButtonExtra = queuePromptTelemetry({
-      workspacePath: "/tmp/workspace-a",
-      taskId: "task-a",
-      messageId: "message-a",
-      sendTime: 200,
-      extraDetail: buildPromptTelemetryExtraDetail({
-        askMode: "chat",
-        modelName: "glm-5.1",
-        provider: "glm",
-        providerBaseURL: "https://api.z.ai/api/paas/v4",
-        planIdentitySnapshot: {
-          generatedAt: 100,
-          planStatus: "coding_plan",
-          planProductId: "product-coding-pro",
-        },
-      }),
-    });
-    activatePromptTelemetry("task-a", "message-a");
-
-    const completion = finalizePromptTelemetry({
-      taskId: "task-a",
-      status: "success",
-      finishedAt: 300,
-      taskMessages: [],
-      fileChanges: [],
-    });
-
-    expect(sendButtonExtra).toMatchObject({
-      plan_status: "coding_plan",
-      plan_product_id: "product-coding-pro",
-      provider_name: "api.z.ai",
-    });
-    expect(completion?.eventExtraDetail).toMatchObject({
-      plan_status: "coding_plan",
-      plan_product_id: "product-coding-pro",
-      provider_name: "api.z.ai",
     });
   });
 
@@ -757,8 +711,6 @@ describe("messageTelemetry", () => {
       model_name: "4209ad4c-6650-4928-b44e-1167f913289a/deepseek-v4-flash",
       model_provider: "4209ad4c-6650-4928-b44e-1167f913289a",
       agent: "glm",
-      plan_status: "unknown",
-      plan_product_id: "",
     });
 
     expect(
@@ -773,8 +725,6 @@ describe("messageTelemetry", () => {
       model_name: encodeCustomModelValue("provider-custom", "deepseek-v4-flash"),
       model_provider: "provider-custom",
       agent: "glm",
-      plan_status: "unknown",
-      plan_product_id: "",
     });
   });
 
@@ -890,7 +840,7 @@ describe("messageTelemetry", () => {
       inputId: "input-current",
       sendTime: 100,
       extraDetail: {
-        model_name: "account:bigmodel-start-plan/GLM-5.2",
+        model_name: "bigmodel-api/GLM-5.2",
         model_provider: "provider-custom",
       },
     });
@@ -918,7 +868,7 @@ describe("messageTelemetry", () => {
         finishedAt: 180,
       })?.eventExtraDetail,
     ).toMatchObject({
-      model_name: "builtin:bigmodel-start-plan/GLM-5.2",
+      model_name: "builtin:bigmodel/GLM-5.2",
       model_provider: "provider-custom",
     });
   });

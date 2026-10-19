@@ -44,7 +44,7 @@ describe("Session 原选择与输入协议", () => {
     await request(server, zcodeProtocolMethods.sessionClose, { sessionId: app.sessionId });
   });
 
-  it("附件 Selection 进入同一个 input intent，执行凭据只进入非持久执行依赖", async () => {
+  it("附件 Selection 进入同一个 input intent，执行作用域只进入非持久执行依赖", async () => {
     let app!: ReturnType<typeof createFakeApp>;
     let finish!: (value: never) => void;
     const completion = new Promise<never>((resolve) => {
@@ -77,7 +77,6 @@ describe("Session 原选择与输入协议", () => {
       modelExecution: {
         selectionScope: "execution",
         memoryExtraction: "skip",
-        requestAuth: { headers: { "x-ticket": "fixture" } },
       },
     });
     await vi.waitFor(() => expect(sendInput).toHaveBeenCalled());
@@ -93,10 +92,6 @@ describe("Session 原选择与输入协议", () => {
       intent: { modelSelection: selection },
       modelExecution: { selectionScope: "execution", memoryExtraction: "skip" },
     });
-    expect(JSON.stringify(options?.intent)).not.toContain("x-ticket");
-    expect(
-      await options?.modelExecution?.requestDependencies?.requestAuth?.source.resolve({} as never),
-    ).toEqual({ headers: { "x-ticket": "fixture" } });
     expect(app.runtime.getSessionModelSelection()?.providerId).toBe("glm");
     try {
       const next = await server.handleMessage({

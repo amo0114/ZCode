@@ -85,7 +85,6 @@ function useDraftConfigControl(
           ? resolveEffectiveModelSelection({
               selection: input.selection,
               registry: view as unknown as ProviderRegistryView,
-              classifyProvider: () => "ordinary",
             })
           : {}),
       }),

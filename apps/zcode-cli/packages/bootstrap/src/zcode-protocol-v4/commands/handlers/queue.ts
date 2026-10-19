@@ -8,7 +8,6 @@ import type {
   CommandPayloadMap,
   CommandResult,
 } from "@zcode/shared/zcode-protocol-v4";
-import { isHighspeedProviderId } from "@zcode/shared";
 import { createModelExecutionContext } from "../../../zcode-protocol/model-execution.js";
 import { mapAttachmentRefsToTurnAttachments } from "../attachment-refs.js";
 import { inputIntentMetadataFromQueueItem } from "../input-intent.js";
@@ -21,7 +20,6 @@ import {
   startManualCompact,
   V4GoalCompactRejectedError,
 } from "./goal-compact.js";
-import { resolveSessionFallbackModelSelection } from "../input-admission.js";
 import { preemptActiveTurnAndWait } from "./session-flow.js";
 import { V4CommandNoopError } from "../../v4-gateway.js";
 import { commandExecutionContextOf } from "../executor.js";
@@ -251,45 +249,11 @@ async function sendQueuedNow(
       leaseReleaseOwnedByBackground = goalContinuationWillStart;
     } else {
       const intent = inputIntentMetadataFromQueueItem(queueItem, queueItem.text);
-      // 手动提升允许 Renderer 为同一张卡补一份新执行材料；卡不同一律忽略，避免跨卡换凭据。
-      const refreshedHighspeedMatchesQueue =
-        payload.highspeedMeta !== undefined &&
-        queueItem.highspeed !== undefined &&
-        payload.highspeedMeta.cardId === queueItem.highspeed.cardId &&
-        payload.highspeedMeta.taskId === queueItem.highspeed.taskId;
-      if (refreshedHighspeedMatchesQueue && payload.highspeedMeta) {
-        intent.highspeed = payload.highspeedMeta;
-        // Selection 与执行材料必须同批替换（协议已用 superRefine 保证成对到达）。
-        if (payload.modelSelection) intent.modelSelection = payload.modelSelection;
-      }
-      // 凭据不入队列持久化面：先用本次补供的材料，其次取 CLI 内存按 sourceCommandId 的暂存。
-      const stagedExecution =
-        (refreshedHighspeedMatchesQueue ? payload.modelExecution : undefined) ??
-        host.readQueuedTurnExecution?.(record.app.sessionId, queueItem.sourceCommandId);
-      const highspeedSelected = isHighspeedProviderId(intent.modelSelection?.providerId);
-      // 规则 9：卡在排队期间可能过期。提升前重新判定有效性，过期或凭据缺失都退回会话模型。
-      const highspeedStillValid =
-        highspeedSelected &&
-        intent.highspeed !== undefined &&
-        intent.highspeed.expiresAt > Date.now() &&
-        stagedExecution !== undefined;
-      if (highspeedSelected && !highspeedStillValid) {
-        if (intent.highspeed && intent.highspeed.expiresAt > Date.now()) {
-          // Bug 原因：现场出现有效卡的队列项在手动提升时静默退回普通模型，原日志只覆盖
-          // provider 安装失败，无法区分「凭据暂存缺失」与「卡本身已过期」。
-          host.logger?.warn?.("v4 queued Highspeed execution unavailable; using session model", {
-            cardId: intent.highspeed.cardId,
-            queueItemId: queueItem.queueItemId,
-            reason: "execution_missing",
-            sessionId: record.app.sessionId,
-          });
-        }
-        // 退回必须同时改写 Selection：只删卡标记会让本轮带着加速 provider 却没有任何凭据。
-        // 与 retry/edit 重发共用同一 fallback resolver（spec §3 规则 13）。
-        delete intent.highspeed;
-        intent.modelSelection = resolveSessionFallbackModelSelection(record);
-        host.deleteQueuedTurnExecution?.(record.app.sessionId, queueItem.sourceCommandId);
-      }
+      // 凭据不入队列持久化面：只取 CLI 内存按 sourceCommandId 的暂存。
+      const stagedExecution = host.readQueuedTurnExecution?.(
+        record.app.sessionId,
+        queueItem.sourceCommandId,
+      );
       const started = await startPromptTurn(host, record, {
         content: queueItem.text,
         inputId: queueItem.sourceCommandId,
@@ -298,7 +262,7 @@ async function sendQueuedNow(
         intent,
         requireIdle: true,
         toolDisallowlist: queueItem.toolDisallowlist,
-        ...(highspeedStillValid && stagedExecution
+        ...(stagedExecution
           ? { modelExecution: createModelExecutionContext(stagedExecution) }
           : {}),
         ...(attachments ? { attachments } : {}),

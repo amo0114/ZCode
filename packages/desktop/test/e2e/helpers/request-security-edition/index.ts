@@ -17,9 +17,6 @@ export function restoreRequestSecurityEndpointEnv(
   _preset: string,
   _mode: string,
 ): void {}
-export function requestSecurityClientConfig(): Record<string, never> {
-  return {};
-}
 export function isRequestSecuritySpec(_name: string | undefined): boolean {
   return false;
 }

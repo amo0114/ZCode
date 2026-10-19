@@ -1,4 +1,3 @@
-import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
 import { buildProviderResponsiveStartBalance } from "./provider-family-responsive.js";
 
 /** 专属展示夹具；不改变其他套餐 E2E 的默认响应。 */
@@ -10,7 +9,7 @@ export interface EntitlementPresentation {
 
 export function presentationResponse(path: string, state: EntitlementPresentation) {
   if (path === "/api/v1/client/configs") {
-    const provider = BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan;
+    const provider = "account:bigmodel-individual-coding-plan";
     return {
       code: 0,
       data: {

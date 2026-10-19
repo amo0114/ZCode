@@ -69,7 +69,7 @@ describe("TelemetryCore final HTTP privacy boundary", () => {
   });
 
   it.each(["agent_step", "message_completion", "automation_create_result", "future_event"])(
-    "直接 Core 调用 %s 与重试都不发送错误原文，正常鉴权不变",
+    "直接 Core 调用 %s 与重试都不发送错误原文",
     async (elementName) => {
       const homeDir = await mkdtemp(join(tmpdir(), "telemetry-privacy-"));
       homes.push(homeDir);
@@ -81,7 +81,6 @@ describe("TelemetryCore final HTTP privacy boundary", () => {
         homeDir,
         fetchImpl,
         sleep: async () => {},
-        loadAuthorization: async () => "Bearer FAKE_AUTH_HEADER",
       });
       await core.reportEvent({
         context: { clientTimezone: "UTC", clientLanguage: "en-US", screenResolution: "1x1" },
@@ -100,8 +99,6 @@ describe("TelemetryCore final HTTP privacy boundary", () => {
         error_code: "E_TEST",
       });
       expect(String(request.body)).not.toContain("FAKE_BODY_SECRET");
-      expect(String(request.body)).not.toContain("FAKE_AUTH_HEADER");
-      expect(request.headers).toMatchObject({ Authorization: "Bearer FAKE_AUTH_HEADER" });
       expect(fetchImpl.mock.calls[1]![1]!.body).toBe(request.body);
     },
   );

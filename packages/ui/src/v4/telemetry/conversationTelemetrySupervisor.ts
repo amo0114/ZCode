@@ -74,7 +74,7 @@ export interface ConversationPromptTelemetrySeed {
   extraDetail: Record<string, string>;
   /**
    * 发送漏斗关联 ID，配对 send_click ↔ send_result。仅 composer 真实点击产生；
-   * 后台任务（off_peak / automation）seed 无此字段，落定时直接跳过不报。
+   * 后台任务（automation）seed 无此字段，落定时直接跳过不报。
    */
   sendClickId?: string;
   /** 是否中途经过队列二次确认弹窗（该子集的 send_cost_ms 含用户停留时间）。 */
@@ -147,18 +147,9 @@ function backgroundSeedFromTurnStarted(
   fact: Extract<ConversationTelemetryFact, { kind: "turn.started" }>,
 ): AcceptedConversationPromptTelemetrySeed | null {
   if (!fact.sourceCommandId) return null;
-  if (fact.offPeakTaskId) {
-    return {
-      sessionId: fact.sessionId,
-      sourceCommandId: fact.sourceCommandId,
-      sendTime: fact.occurredAt,
-      extraDetail: {
-        message_source: "off_peak_task",
-        off_peak_task_id: fact.offPeakTaskId,
-        ...(fact.offPeakRunType ? { off_peak_run_type: fact.offPeakRunType } : {}),
-      },
-    };
-  }
+  // 闲时任务归因已移除：原分支依赖的归因字段已从协议删除，
+  // 等价路径是落到下方 automation 判定——两者在 schema 上互斥，
+  // 故 automationId 恒空，最终由 inputSource 判定返回 null。
   if (!fact.automationId || !fact.taskTrigger) {
     if (fact.inputSource !== "background_task") return null;
     return {
@@ -201,8 +192,6 @@ const STEP_SOURCE_DETAIL_KEYS = [
   "message_source",
   "task_trigger",
   "automation_id",
-  "off_peak_task_id",
-  "off_peak_run_type",
 ] as const;
 
 function stepSourceDetailOf(extraDetail: Record<string, string>): Record<string, string> {

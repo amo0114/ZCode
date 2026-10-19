@@ -2,11 +2,9 @@ import {
   ApiKeyAccessConfig,
   ProviderApiConfig,
   ProviderConfig,
-  ZhipuAccountAccessConfig,
   type ModelId,
   type ProviderApiType,
   type ProviderLogoRef,
-  type ZhipuAccountMode,
 } from "@zcode/provider";
 
 interface CommonProviderFixtureInput {
@@ -31,27 +29,6 @@ export function createApiKeyProviderConfig(
     access: new ApiKeyAccessConfig({
       apiKey: input.apiKey,
       apiKeyManagementUrl: input.apiKeyManagementUrl,
-    }),
-    api: createProviderApi(input),
-    builtinModelIds: input.models,
-    enabled: input.enabled,
-  });
-}
-
-export function createAccountProviderConfig(
-  input: CommonProviderFixtureInput & {
-    accountType?: "zai" | "bigmodel";
-    mode?: ZhipuAccountMode;
-    entitled?: boolean | null;
-  } = {},
-): ProviderConfig {
-  return new ProviderConfig({
-    label: input.label,
-    logo: input.logo,
-    access: new ZhipuAccountAccessConfig({
-      accountType: input.accountType ?? "zai",
-      mode: input.mode ?? "individual-coding-plan",
-      entitled: input.entitled,
     }),
     api: createProviderApi(input),
     builtinModelIds: input.models,

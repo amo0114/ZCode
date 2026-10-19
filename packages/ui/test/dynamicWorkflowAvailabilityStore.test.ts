@@ -1,7 +1,7 @@
 // 动态工作流灰度快照在 renderer 的唯一副本（docs/dynamic-workflow/launch.md「Gray release」DWG-07）。
 // 只钉三件事：一个 app 会话取一次、失败 fail-closed、换了 service 实例会重试。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ICodingPlanSubscriptionService } from "@zcode/services";
+import type { IZCodeAgentService } from "@zcode/services";
 import {
   applyDynamicWorkflowUserMode,
   createDynamicWorkflowClientConfig,
@@ -26,26 +26,22 @@ const DISABLED: DynamicWorkflowClientConfig = createDynamicWorkflowClientConfig(
   "remote",
 );
 
-function serviceReturning(config: DynamicWorkflowClientConfig): ICodingPlanSubscriptionService & {
+type MockConfigService = Pick<IZCodeAgentService, "getDynamicWorkflowClientConfig"> & {
   getDynamicWorkflowClientConfig: ReturnType<typeof vi.fn>;
-} {
+};
+
+function serviceReturning(config: DynamicWorkflowClientConfig): MockConfigService {
   return {
     getDynamicWorkflowClientConfig: vi.fn(async () => config),
-  } as unknown as ICodingPlanSubscriptionService & {
-    getDynamicWorkflowClientConfig: ReturnType<typeof vi.fn>;
-  };
+  } as unknown as MockConfigService;
 }
 
-function serviceFailing(): ICodingPlanSubscriptionService & {
-  getDynamicWorkflowClientConfig: ReturnType<typeof vi.fn>;
-} {
+function serviceFailing(): MockConfigService {
   return {
     getDynamicWorkflowClientConfig: vi.fn(async () => {
       throw new Error("host unreachable");
     }),
-  } as unknown as ICodingPlanSubscriptionService & {
-    getDynamicWorkflowClientConfig: ReturnType<typeof vi.fn>;
-  };
+  } as unknown as MockConfigService;
 }
 
 describe("dynamicWorkflowAvailabilityStore", () => {
@@ -122,23 +118,8 @@ describe("dynamicWorkflowAvailabilityStore", () => {
     expect(useDynamicWorkflowAvailabilityStore.getState().enabled).toBe(true);
   });
 
-  it("refresh 绕过闩并带 forceRefresh，用来在设置变化后重取", async () => {
-    const service = serviceReturning(DISABLED);
-    await useDynamicWorkflowAvailabilityStore.getState().ensureLoaded(service);
-    service.getDynamicWorkflowClientConfig.mockResolvedValue(ENABLED);
-
-    await useDynamicWorkflowAvailabilityStore.getState().refresh(service);
-
-    expect(service.getDynamicWorkflowClientConfig).toHaveBeenCalledTimes(2);
-    expect(service.getDynamicWorkflowClientConfig).toHaveBeenLastCalledWith({
-      forceRefresh: true,
-    });
-    expect(useDynamicWorkflowAvailabilityStore.getState().enabled).toBe(true);
-  });
-
-  // DWG-22（launch.md「The user's choice」）：用户改选择后 Host 先重发策略，renderer 再重读快照；
-  // 不带 forceRefresh——服务端的「提供」不变，变的只是 Host 套上的用户选择。
-  it("reload 绕过闩但不带 forceRefresh，读到 Host 套上用户选择后的生效值", async () => {
+  // DWG-22（launch.md「The user's choice」）：用户改选择后 Host 先重发策略，renderer 再重读快照。
+  it("reload 绕过闩，读到 Host 套上用户选择后的生效值", async () => {
     const service = serviceReturning(ENABLED);
     await useDynamicWorkflowAvailabilityStore.getState().ensureLoaded(service);
     service.getDynamicWorkflowClientConfig.mockResolvedValue(
@@ -148,7 +129,6 @@ describe("dynamicWorkflowAvailabilityStore", () => {
     await useDynamicWorkflowAvailabilityStore.getState().reload(service);
 
     expect(service.getDynamicWorkflowClientConfig).toHaveBeenCalledTimes(2);
-    expect(service.getDynamicWorkflowClientConfig).toHaveBeenLastCalledWith({});
     const state = useDynamicWorkflowAvailabilityStore.getState();
     expect(state.enabled).toBe(false);
     expect(state.config).toMatchObject({ mode: "disabled", offeredMode: "alwaysOn" });
