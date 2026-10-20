@@ -4655,6 +4655,7 @@ export function SessionPane({
       <div
         data-testid={testId(TID_V4_SESSION_PANE, paneId)}
         data-session-id={sessionId ?? "draft"}
+        data-effective-session-id={effectiveSessionId ?? ""}
         data-initial-draft-provider={initialDraftConfigForDiagnostics?.provider ?? ""}
         data-initial-draft-model={initialDraftConfigForDiagnostics?.model ?? ""}
         data-projection-seq={snapshot?.seq ?? ""}
