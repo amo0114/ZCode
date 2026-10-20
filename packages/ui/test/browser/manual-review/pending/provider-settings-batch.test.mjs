@@ -277,21 +277,20 @@ for (const [width, locale, theme] of [
     });
     try {
       await page.goto(`${origin}fixture?${new URLSearchParams({ locale, theme })}`);
-      const group = page.locator('[data-provider-template-group="zhipu"]');
-      await group.waitFor();
-      assert.equal(await group.locator("button").count(), 4);
-      assert.deepEqual(
-        await group.locator("button").evaluateAll((nodes) => nodes.map((n) => n.dataset.testid)),
-        ["bigmodel-api", "zai-api", "bigmodel-standard-api", "zai-standard-api"].map(
-          (id) => "model-provider-template-item-" + id,
-        ),
-      );
+      const picker = page.getByTestId("model-provider-template-picker");
+      await picker.waitFor();
+      const templateIds = await picker
+        .locator("button[data-testid^='model-provider-template-item-']")
+        .evaluateAll((nodes) => nodes.map((n) => n.dataset.testid));
+      // 智谱 Coding Plan 模板只服务存量 Provider，新建入口不再提供。
+      assert.equal(templateIds.includes("model-provider-template-item-zai-api"), false);
+      assert.equal(templateIds.includes("model-provider-template-item-bigmodel-api"), false);
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true,
       );
       await page.screenshot({ path: join(artifacts, `templates-${width}.png`) });
-      await group.locator("button").first().click();
+      await page.getByTestId("model-provider-template-item-bigmodel-standard-api").click();
       const toggle = page.getByTestId("model-provider-enabled-switch");
       await toggle.waitFor();
       assert.equal(await toggle.getAttribute("aria-checked"), "true");

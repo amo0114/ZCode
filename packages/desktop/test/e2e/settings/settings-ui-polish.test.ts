@@ -287,20 +287,16 @@ describe("设置页 UI polish E2E", () => {
     expect(templateLayout.cardHeights.every((height) => height >= 64)).toBe(true);
     expect(templateLayout.columns).toBe(2);
     expect(templateLayout.hasChevron).toBe(true);
-    expect(
-      await browser.execute(() =>
-        Array.from(
-          document.querySelectorAll(
-            '[data-provider-template-group="zhipu"] [data-testid^="model-provider-template-item-"]',
-          ),
-        ).map((node) => node.getAttribute("data-testid")),
+    const templateItemIds = await browser.execute(() =>
+      Array.from(document.querySelectorAll('[data-testid^="model-provider-template-item-"]')).map(
+        (node) => node.getAttribute("data-testid"),
       ),
-    ).toEqual([
-      "model-provider-template-item-bigmodel-api",
-      "model-provider-template-item-zai-api",
-      "model-provider-template-item-bigmodel-standard-api",
-      "model-provider-template-item-zai-standard-api",
-    ]);
+    );
+    // 智谱 Coding Plan 模板只服务存量 Provider，新建入口不再提供；智谱标准 API 与其他供应商平铺展示。
+    expect(templateItemIds).not.toContain("model-provider-template-item-zai-api");
+    expect(templateItemIds).not.toContain("model-provider-template-item-bigmodel-api");
+    expect(templateItemIds).toContain("model-provider-template-item-zai-standard-api");
+    expect(templateItemIds).toContain("model-provider-template-item-bigmodel-standard-api");
     await clickTestIdByDom(TID_MODEL_PROVIDER_TEMPLATE_BACK_BUTTON);
     await browser.waitUntil(
       async () =>

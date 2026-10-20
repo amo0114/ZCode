@@ -83,6 +83,32 @@ describe("ProviderTemplatePicker", () => {
     expect(html).not.toContain('type="search"');
   });
 
+  it("新建入口不提供仅服务存量 Provider 的智谱 Coding Plan Template", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(ProviderTemplatePicker, {
+          templates: ["zai-api", "zai-standard-api", "bigmodel-api", "bigmodel-standard-api"].map(
+            (templateId) => ({ templateId, templateNameMap: { "zh-CN": templateId }, config: {} }),
+          ),
+          onBack: vi.fn(),
+          onCreateFromTemplate: vi.fn(),
+          onCreateCustom: vi.fn(),
+          creating: false,
+        }),
+      ),
+    );
+
+    for (const hidden of ["zai-api", "bigmodel-api"]) {
+      expect(html).not.toContain(`data-testid="${testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, hidden)}"`);
+    }
+    for (const shown of ["zai-standard-api", "bigmodel-standard-api"]) {
+      expect(html).toContain(`data-testid="${testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, shown)}"`);
+    }
+    expect(html).not.toContain("data-provider-template-group");
+  });
+
   it("Template 创建失败时在详情底部显示错误并允许重试", async () => {
     const onCreateFromTemplate = vi
       .fn<(templateId: string) => Promise<void>>()

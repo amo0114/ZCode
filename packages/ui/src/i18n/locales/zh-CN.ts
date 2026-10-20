@@ -793,7 +793,7 @@ const zhCN: Record<string, string> = {
   // 登录
   "welcome.title": "Welcome to ZCode",
   "login.title": "欢迎来到 ZCode",
-  "login.description": "连接账号，开始使用 ZCode",
+  "login.description": "配置模型 API Key，开始使用 ZCode",
   "login.oauth.activeProviderHint": "当前已登录提供方：{provider}。新登录会替换当前登录身份。",
   "login.oauth.loadingProviders": "正在加载登录提供方...",
   "login.oauth.button": "继续使用 {provider}",
@@ -2810,8 +2810,6 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.catalogProviderEmpty": "未找到供应商",
   "settings.modelProvider.addProviderAction": "添加供应商",
   "settings.modelProvider.templatePickerTitle": "添加供应商",
-  "settings.modelProvider.templateGroup.zhipu": "智谱",
-  "settings.modelProvider.templateGroup.other": "其他",
   "settings.modelProvider.templatePickerBack": "返回供应商详情",
   "settings.modelProvider.addProviderModelReminder": "添加供应商前，请至少添加一个模型。",
   "settings.modelProvider.baseUrl": "Base URL",

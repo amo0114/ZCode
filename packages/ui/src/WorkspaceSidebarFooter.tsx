@@ -70,9 +70,11 @@ function getSidebarProfileName(user?: UserInfo | null): string {
 
 function getSidebarProfileBadge(
   user: UserInfo | null | undefined,
+  canLogin: boolean,
   formatMessage: ReturnType<typeof useZCodeIntl>["intl"]["formatMessage"],
 ): string {
-  if (user) {
+  // 没有登录渠道时「连接使用」只会引导到不存在的账号入口，按无用户名兜底显示。
+  if (user || !canLogin) {
     return getSidebarProfileName(user);
   }
 
@@ -129,7 +131,7 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooterCompon
   const zoomOutShortcutLabel = useShortcutCommandLabel("zoomOut");
   const resetZoomShortcutLabel = useShortcutCommandLabel("resetZoom");
   const isRestoringOAuthSession = useZCodeStore((state) => state.isRestoringOAuthSession);
-  const profileBadge = getSidebarProfileBadge(user, intl.formatMessage);
+  const profileBadge = getSidebarProfileBadge(user, Boolean(onLogin), intl.formatMessage);
   const avatarFallbackText = getAvatarFallbackText(user);
   const avatarKey = user?.avatarUrl ?? user?.id ?? "guest";
   const showAuthRestoreLoading = !user && isRestoringOAuthSession;
