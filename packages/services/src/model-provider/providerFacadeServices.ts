@@ -19,6 +19,7 @@ import {
 import { createServiceDescriptor } from "../descriptors.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
 import { createServiceLogger } from "../logger/serviceLogger.js";
+import type { ListRemoteModelsInput } from "./remoteModelList.js";
 
 export type {
   ProviderSettingsProviderView,
@@ -68,6 +69,8 @@ export interface IProviderSettingsService {
   testModelConnectivity(
     input: ProviderSettingsConnectivityRequest,
   ): Promise<ModelConnectivityResult>;
+  /** 用尚未保存的 Base URL / API Key 拉取远端模型 ID 列表，供新建自定义 Provider 时挑选。 */
+  listRemoteModels(input: ListRemoteModelsInput): Promise<readonly string[]>;
 }
 
 export const IProviderSettingsService = createServiceDescriptor<IProviderSettingsService>(
@@ -110,6 +113,7 @@ export function createProviderSettingsService(
   facade: ProviderSettingsFacade,
   ensureReady: () => Promise<void> = async () => {},
   testConnectivity?: ProviderSettingsConnectivityTester,
+  listRemoteModels?: (input: ListRemoteModelsInput) => Promise<readonly string[]>,
 ): IProviderSettingsService {
   return {
     onDidChange: toEvent((listener) => facade.onDidChange(listener)),
@@ -164,6 +168,12 @@ export function createProviderSettingsService(
     setPersonalModelEnabled: async (providerId, modelId, enabled) => {
       await ensureReady();
       return facade.setPersonalModelEnabled(providerId, modelId, enabled);
+    },
+    listRemoteModels: async (input) => {
+      if (!listRemoteModels) {
+        throw new Error("当前 Environment 未装配远端模型列表能力");
+      }
+      return listRemoteModels(input);
     },
     testModelConnectivity: async (input) => {
       await ensureReady();

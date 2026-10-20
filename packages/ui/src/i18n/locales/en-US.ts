@@ -892,6 +892,11 @@ const enUS: Record<string, string> = {
   "login.apiKey.customProvider": "Custom provider",
   "login.apiKey.customBaseUrlInvalid": "Enter a Base URL starting with http:// or https://",
   "login.apiKey.customModelPlaceholder": "Model ID, e.g. gpt-4o",
+  "login.apiKey.fetchModels": "Fetch models",
+  "login.apiKey.fetchModelsError":
+    "Couldn't fetch the model list. Check the Base URL and API key, or enter a model ID manually",
+  "login.apiKey.searchModels": "Search models",
+  "login.apiKey.noModelsFound": "No matching models",
   "login.apiKey.getApiKey": "Get API Key",
   "login.apiKey.cancel": "Cancel",
   "login.apiKey.continue": "Continue",

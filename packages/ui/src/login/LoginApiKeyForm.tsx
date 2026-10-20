@@ -8,6 +8,7 @@ import { Loader2Icon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import {
   TID_LOGIN_API_KEY_BASE_URL_INPUT,
   TID_LOGIN_API_KEY_CANCEL_BUTTON,
+  TID_LOGIN_API_KEY_FETCH_MODELS_BUTTON,
   TID_LOGIN_API_KEY_CONTINUE_BUTTON,
   TID_LOGIN_API_KEY_ERROR,
   TID_LOGIN_API_KEY_INPUT,
@@ -19,7 +20,15 @@ import {
 } from "@zcode/shared";
 import { Alert, AlertDescription } from "@/components/ui/alert.js";
 import { Button } from "@/components/ui/button.js";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command.js";
 import { Input } from "@/components/ui/input.js";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover.js";
 import {
   Select,
   SelectContent,
@@ -61,6 +70,9 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   const [customApiFormat, setCustomApiFormat] = useState<ProviderApiType>("openai-chat-completions");
   const [customBaseUrl, setCustomBaseUrl] = useState("");
   const [customModelId, setCustomModelId] = useState("");
+  const [remoteModels, setRemoteModels] = useState<readonly string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +96,32 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   const apiKeyUrl = isApiKeyAccess(templateAccess) ? templateAccess.apiKeyManagementUrl : undefined;
   // 用户已经输入或回填 API Key 后，右侧获取入口会挤占密码输入区域。
   const showApiKeyLink = shouldShowLoginApiKeyLink(apiKeyValue, apiKeyUrl ?? undefined);
+
+  const canFetchModels =
+    isValidCustomProviderBaseUrl(customBaseUrl) && apiKeyValue.trim().length > 0 && !fetchingModels;
+
+  const fetchRemoteModels = async () => {
+    setFetchingModels(true);
+    setError(null);
+    try {
+      const models = await providerSettingsService.listRemoteModels({
+        apiType: customApiFormat,
+        baseUrl: customBaseUrl.trim(),
+        apiKey: apiKeyValue.trim(),
+      });
+      if (models.length === 0) {
+        setError(intl.formatMessage({ id: "login.apiKey.fetchModelsError" }));
+        return;
+      }
+      setRemoteModels(models);
+      setModelPickerOpen(true);
+    } catch (fetchError) {
+      logger.warn("[LoginEntry] 获取自定义 provider 模型列表失败", { error: fetchError });
+      setError(intl.formatMessage({ id: "login.apiKey.fetchModelsError" }));
+    } finally {
+      setFetchingModels(false);
+    }
+  };
 
   const saveCustomProvider = async (apiKey: string) => {
     const created = await providerSettingsService.createPersonalProvider({
@@ -327,27 +365,70 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
             ) : null}
           </div>
           {isCustom ? (
-            <Input
-              type="text"
-              size="lg"
-              className="h-10 w-full text-ui-base"
-              data-testid={TID_LOGIN_API_KEY_MODEL_INPUT}
-              aria-label={intl.formatMessage({ id: "settings.modelProvider.modelId" })}
-              value={customModelId}
-              placeholder={intl.formatMessage({ id: "login.apiKey.customModelPlaceholder" })}
-              autoComplete="off"
-              spellCheck={false}
-              disabled={busy}
-              onChange={(event) => {
-                setCustomModelId(event.target.value);
-                setError(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && apiKeyValue.trim() && customReady && !busy) {
-                  void saveApiKeyProvider();
-                }
-              }}
-            />
+            <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+              <PopoverAnchor asChild>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    size="lg"
+                    className="h-10 min-w-0 flex-1 text-ui-base"
+                    data-testid={TID_LOGIN_API_KEY_MODEL_INPUT}
+                    aria-label={intl.formatMessage({ id: "settings.modelProvider.modelId" })}
+                    value={customModelId}
+                    placeholder={intl.formatMessage({ id: "login.apiKey.customModelPlaceholder" })}
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setCustomModelId(event.target.value);
+                      setError(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && apiKeyValue.trim() && customReady && !busy) {
+                        void saveApiKeyProvider();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-10 shrink-0 text-ui-base"
+                    data-testid={TID_LOGIN_API_KEY_FETCH_MODELS_BUTTON}
+                    disabled={busy || !canFetchModels}
+                    onClick={() => void fetchRemoteModels()}
+                  >
+                    {fetchingModels ? <Loader2Icon className="size-4 animate-spin" /> : null}
+                    {intl.formatMessage({ id: "login.apiKey.fetchModels" })}
+                  </Button>
+                </div>
+              </PopoverAnchor>
+              <PopoverContent align="start" className="w-(--radix-popover-trigger-width) p-0">
+                <Command>
+                  <CommandInput
+                    placeholder={intl.formatMessage({ id: "login.apiKey.searchModels" })}
+                  />
+                  <CommandList className="max-h-64">
+                    <CommandEmpty>
+                      {intl.formatMessage({ id: "login.apiKey.noModelsFound" })}
+                    </CommandEmpty>
+                    {remoteModels.map((modelId) => (
+                      <CommandItem
+                        key={modelId}
+                        value={modelId}
+                        onSelect={() => {
+                          setCustomModelId(modelId);
+                          setModelPickerOpen(false);
+                          setError(null);
+                        }}
+                      >
+                        {modelId}
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           ) : null}
         </div>
       </div>
