@@ -812,7 +812,8 @@ const zhCN: Record<string, string> = {
   "login.apiKey.customBaseUrlInvalid": "请输入以 http:// 或 https:// 开头的 Base URL",
   "login.apiKey.customModelPlaceholder": "模型 ID，例如 gpt-4o",
   "login.apiKey.fetchModels": "获取模型",
-  "login.apiKey.fetchModelsError": "未能获取模型列表，请检查 Base URL 和 API Key，或直接填写模型 ID",
+  "login.apiKey.fetchModelsError":
+    "未能获取模型列表，请检查 Base URL 和 API Key，或直接填写模型 ID",
   "login.apiKey.searchModels": "搜索模型",
   "login.apiKey.noModelsFound": "没有匹配的模型",
   "login.apiKey.customNamePlaceholder": "名称（可选）",
@@ -2265,6 +2266,25 @@ const zhCN: Record<string, string> = {
   "settings.nativeSearchEnhancementsDescription":
     "在新建会话或应用重启后恢复的会话中使用增强 Find 和 Grep。当前会话保持现有设置；Windows 的 Find 保持不变。",
   "settings.memory": "记忆",
+  "settings.securityBoundary.title": "安全边界",
+  "settings.securityBoundary.loading": "正在读取配置…",
+  "settings.securityBoundary.currentState": "当前状态",
+  "settings.securityBoundary.currentStateDescription": "未配置时所有模型使用官方条款。",
+  "settings.securityBoundary.stateAllOfficial": "全部使用官方条款",
+  "settings.securityBoundary.stateCustomized":
+    "已自定义（放宽 {unrestricted} 项，强制 {strict} 项）",
+  "settings.securityBoundary.unrestrictedTitle": "使用放宽条款的模型",
+  "settings.securityBoundary.unrestrictedDescription":
+    "关键词出现在模型 ID 或供应商 ID 中即命中；不区分大小写。",
+  "settings.securityBoundary.unrestrictedEmpty": "暂无。所有未命中的模型都使用官方条款。",
+  "settings.securityBoundary.strictTitle": "强制使用官方条款的模型",
+  "settings.securityBoundary.strictDescription":
+    "优先级高于放宽列表。用于排除那些放宽后反而表现变差的模型。",
+  "settings.securityBoundary.strictEmpty": "暂无。",
+  "settings.securityBoundary.keywordPlaceholder": "例如 deepseek 或 glm",
+  "settings.securityBoundary.writeFailed": "写入失败：{error}",
+  "settings.securityBoundary.restartHint": "修改后需完全退出并重新打开 ZCode 才会生效。",
+  "settings.securityBoundary.reset": "恢复默认",
   "settings.memory.workspaceMemory": "工作区记忆",
   "settings.memoryDescription":
     "在工作区中保存并复用长期上下文，新会话生效。开启后可能增加模型调用和 Token 成本。",
@@ -3017,8 +3037,7 @@ const zhCN: Record<string, string> = {
   "settings.usage.appUsageLoadingDescription": "正在读取本地应用会话历史，可能需要一点时间。",
   "settings.usage.error": "无法读取用量统计。请稍后重试，或检查网络和供应商配置。",
   "settings.usage.checkApiKey": "检查账号",
-  "usage.error.stats.credential":
-    "无法读取用量统计。请检查供应商的 API Key 是否有效。",
+  "usage.error.stats.credential": "无法读取用量统计。请检查供应商的 API Key 是否有效。",
   "usage.error.stats.generic": "无法读取用量统计。请稍后重试，或检查网络和供应商配置。",
   "settings.usage.emptyTitle": "还没有可展示的数据",
   "settings.usage.emptyDescription": "当前区间暂无可展示的用量数据。",

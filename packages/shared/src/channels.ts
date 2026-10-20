@@ -196,6 +196,10 @@ export const PlatformChannels = {
   CreateTempTextAttachment: "zcode:create-temp-text-attachment",
   /** Renderer → Main：把 dwf 产物某一版的字节落成本机副本（「作为文件打开」） */
   MaterializeWorkflowArtifactFile: "zcode:materialize-workflow-artifact-file",
+  /** Renderer → Main：读取安全边界配置（~/.zcode/cli/security-boundary.json） */
+  ReadSecurityBoundary: "zcode:read-security-boundary",
+  /** Renderer → Main：写入安全边界配置 */
+  WriteSecurityBoundary: "zcode:write-security-boundary",
   /** Renderer → Main：通过原生另存为对话框保存文件 */
   SaveFile: "zcode:save-file",
   /** Renderer → Main：用 Chromium 打印引擎把当前页面 print 媒体版面导出为 PDF */
@@ -707,6 +711,14 @@ export interface PlatformChannelMap {
   [PlatformChannels.SelectDirectory]: {
     request: void;
     response: string | null;
+  };
+  [PlatformChannels.ReadSecurityBoundary]: {
+    request: void;
+    response: { unrestricted: readonly string[]; strict: readonly string[] };
+  };
+  [PlatformChannels.WriteSecurityBoundary]: {
+    request: { unrestricted: readonly string[]; strict: readonly string[] };
+    response: void;
   };
   [PlatformChannels.SelectFile]: {
     request: void;

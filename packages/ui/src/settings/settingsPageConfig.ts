@@ -18,6 +18,7 @@ import {
   WandSparkles,
   Keyboard,
   FileSearch,
+  ShieldCheck,
 } from "lucide-react";
 import { isSettingsSectionEnabled, type SettingsSectionId } from "@/lib/settingsNavigation.js";
 import type { Theme } from "@/useTheme.js";
@@ -71,6 +72,13 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     id: "modelProvider",
     icon: Package,
     titleId: "settings.modelProviderTitle",
+    groupId: "basics",
+  },
+  // 安全边界紧跟「模型与供应商」：配置对象就是模型，放在同一处理解成本最低。
+  {
+    id: "securityBoundary",
+    icon: ShieldCheck,
+    titleId: "settings.securityBoundary.title",
     groupId: "basics",
   },
   {

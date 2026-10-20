@@ -981,7 +981,8 @@ const enUS: Record<string, string> = {
   "browser.permission.deviceBluetooth": "Bluetooth devices",
   "browser.permission.unknownCapability": "an unknown capability",
   "browser.permission.screenShareTitle": "{origin} wants to share your screen",
-  "browser.permission.screenShareDescription": "Choose the screen or window to share. This choice applies only to this session.",
+  "browser.permission.screenShareDescription":
+    "Choose the screen or window to share. This choice applies only to this session.",
   "browser.permission.deviceTitle": "{origin} wants to connect a device",
   "browser.permission.connect": "Connect",
   "browser.permission.screenGroup.screen": "Entire Screen",
@@ -2405,6 +2406,29 @@ const enUS: Record<string, string> = {
   "settings.nativeSearchEnhancementsDescription":
     "Use enhanced Find and Grep in new sessions and sessions restored after an app restart. Active sessions keep their current setting; Find remains unchanged on Windows.",
   "settings.memory": "Memory",
+
+  "settings.securityBoundary.title": "Security Boundary",
+  "settings.securityBoundary.loading": "Reading configuration…",
+  "settings.securityBoundary.currentState": "Current state",
+  "settings.securityBoundary.currentStateDescription":
+    "All models use the official clause until configured.",
+  "settings.securityBoundary.stateAllOfficial": "All models use the official clause",
+  "settings.securityBoundary.stateCustomized":
+    "Customized ({unrestricted} unrestricted, {strict} strict)",
+  "settings.securityBoundary.unrestrictedTitle": "Models using the relaxed clause",
+  "settings.securityBoundary.unrestrictedDescription":
+    "Matches when the keyword appears in the model ID or provider ID; case-insensitive.",
+  "settings.securityBoundary.unrestrictedEmpty":
+    "None. Every unmatched model uses the official clause.",
+  "settings.securityBoundary.strictTitle": "Models forced to the official clause",
+  "settings.securityBoundary.strictDescription":
+    "Takes precedence over the relaxed list. Use it to exclude models that behave worse when relaxed.",
+  "settings.securityBoundary.strictEmpty": "None.",
+  "settings.securityBoundary.keywordPlaceholder": "e.g. deepseek or glm",
+  "settings.securityBoundary.writeFailed": "Write failed: {error}",
+  "settings.securityBoundary.restartHint":
+    "Fully quit and reopen ZCode for changes to take effect.",
+  "settings.securityBoundary.reset": "Reset to default",
   "settings.memory.workspaceMemory": "Workspace Memory",
   "settings.memoryDescription":
     "Save and reuse long-term context in workspaces. Applies to new sessions and may increase model requests and token costs.",

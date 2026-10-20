@@ -48,6 +48,10 @@ import { PluginsSection } from "@/settings/PluginsSection.js";
 import { HooksSection } from "@/settings/HooksSection.js";
 import { WorkspaceFileSearchSection } from "@/settings/WorkspaceFileSearchSection.js";
 import { MemorySettingsSection } from "@/settings/MemorySettingsSection.js";
+import {
+  SecurityBoundarySection,
+  type SecurityBoundaryPort,
+} from "@/settings/SecurityBoundarySection.js";
 import { BrowserSettingsSection } from "@/settings/BrowserSettingsSection.js";
 import { ComputerUseSection } from "@/settings/ComputerUseSection.js";
 import { ShortcutSettingsSection } from "@/settings/ShortcutSettingsSection.js";
@@ -195,6 +199,27 @@ export function SettingsPage({
   const isLinuxDesktop = Boolean(isDesktop && !isMacDesktop && !isWindowsDesktop);
   const usesInlineWindowControls = Boolean(isWindowsDesktop || isLinuxDesktop);
   const platform = usePlatform();
+  // 安全边界配置端口：仅 Desktop 提供；Web / 手机远控没有本地文件能力，
+  // 回退成「读空配置 + 写入报错」，让设置页显示说明而不是静默失败。
+  const securityBoundaryPort = useMemo<SecurityBoundaryPort>(() => {
+    const port = platform.securityBoundary;
+    if (!port) {
+      return {
+        read: async () => ({ unrestricted: [], strict: [] }),
+        write: async () => {
+          throw new Error("当前客户端不支持本地安全边界配置");
+        },
+      };
+    }
+    return {
+      read: async () => {
+        const loaded = await port.read();
+        return { unrestricted: [...loaded.unrestricted], strict: [...loaded.strict] };
+      },
+      write: (config) => port.write(config),
+    };
+  }, [platform]);
+
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(() => {
     const initialSection = consumeInitialSettingsSection("general");
     const visibleInitialSection = resolveSettingsSectionForPlatform(
@@ -1460,6 +1485,8 @@ export function SettingsPage({
                               connectivityWorkspaceRequired={isRemoteModelProviderWorkspace}
                             />
                           </ServiceProvider>
+                        ) : activeSection === "securityBoundary" ? (
+                          <SecurityBoundarySection port={securityBoundaryPort} />
                         ) : activeSection === "memory" ? (
                           <ServiceProvider services={localHostServices}>
                             {/* Memory catalog 始终使用本地 Host，避免远程 workspace 误读本机数据。 */}

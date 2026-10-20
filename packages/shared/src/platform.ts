@@ -650,6 +650,18 @@ export type CuaOsSupport =
  * 比如 native dialog、窗口生命周期控制等。
  * 业务服务（文件、终端、凭据等）走 IServiceAccessor 的 RPC 通道。
  */
+/** 安全边界配置的形状。与 agent 侧 `boundary-policy.ts` 保持一致。 */
+export interface SecurityBoundaryConfigShape {
+  readonly unrestricted: readonly string[];
+  readonly strict: readonly string[];
+}
+
+/** 安全边界配置的读写端口。仅 Desktop 实现。 */
+export interface SecurityBoundaryPlatformPort {
+  read(): Promise<SecurityBoundaryConfigShape>;
+  write(config: SecurityBoundaryConfigShape): Promise<void>;
+}
+
 export interface IPlatformService {
   /** 当前平台的文件选择框是否能返回 agent 可访问的本地绝对路径 */
   canSelectFilePath?: boolean;
@@ -683,6 +695,14 @@ export interface IPlatformService {
    * Web/手机端返回 null，避免 UI 层依赖 Electron 的非标准 File.path。
    */
   getPathForFile?(file: unknown): string | null;
+
+  /**
+   * 安全边界配置（`~/.zcode/cli/security-boundary.json`）。
+   *
+   * 由 Desktop 宿主读写本地文件；Web / 手机远控没有该能力，返回 undefined
+   * 时设置页显示只读说明。Agent 侧读同一份文件，因此这里写入后重启即生效。
+   */
+  securityBoundary?: SecurityBoundaryPlatformPort;
 
   /** 把 Agent 已授权的 Desktop 本地视频路径转换为可供媒体元素读取的宿主 URL。 */
   createLocalMediaPreviewUrl?(path: string): string;

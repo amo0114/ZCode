@@ -1,4 +1,5 @@
 import { decorateRequestSecurityLogArgs } from "./request-security-edition/index.js";
+import { readSecurityBoundary, writeSecurityBoundary } from "./securityBoundaryConfig.js";
 /* eslint-disable max-lines -- 桌面平台 IPC 集中装配，拆散会让权限边界更难审计；行数随平台能力增长。 */
 import { BrowserWindow, dialog, ipcMain, nativeTheme } from "electron";
 import { readZCodeStdioTapDevState } from "@zcode/services/node";
@@ -120,6 +121,24 @@ export function registerPlatformIpcHandlers(options: {
   /** Browser tab 关闭、挂起、恢复与跨重启 shell IPC。 */
   browserViewResidencyHandlers?: BrowserViewResidencyIpcHandlers;
 }) {
+  // 安全边界：读写 ~/.zcode/cli/security-boundary.json。agent 侧读同一份文件，
+  // 因此这里写入后需重启 ZCode 才生效（system prompt 在启动时组装）。
+  ipcMain.handle(PlatformChannels.ReadSecurityBoundary, async () => readSecurityBoundary());
+
+  ipcMain.handle(
+    PlatformChannels.WriteSecurityBoundary,
+    async (_event, config: { unrestricted?: unknown; strict?: unknown }) => {
+      writeSecurityBoundary({
+        unrestricted: Array.isArray(config?.unrestricted)
+          ? config.unrestricted.filter((v): v is string => typeof v === "string")
+          : [],
+        strict: Array.isArray(config?.strict)
+          ? config.strict.filter((v): v is string => typeof v === "string")
+          : [],
+      });
+    },
+  );
+
   ipcMain.handle(PlatformChannels.SelectDirectory, async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],

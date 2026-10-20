@@ -314,6 +314,12 @@ contextBridge.exposeInMainWorld("zcode", {
   log: (level: "info" | "warn" | "error", args: unknown[]) =>
     ipcRenderer.send(PlatformChannels.Log, { level, args }),
   /** 打开系统目录选择框，返回选中路径或 null */
+  securityBoundary: {
+    read: (): Promise<{ unrestricted: string[]; strict: string[] }> =>
+      ipcRenderer.invoke(PlatformChannels.ReadSecurityBoundary),
+    write: (config: { unrestricted: readonly string[]; strict: readonly string[] }): Promise<void> =>
+      ipcRenderer.invoke(PlatformChannels.WriteSecurityBoundary, config),
+  },
   selectDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke(PlatformChannels.SelectDirectory),
   /** 打开系统文件选择框，返回选中文件路径或 null */
