@@ -50,6 +50,30 @@ describe("Provider 数据校验与完整性使用同一合同", () => {
     expect(() => parseProviderConfig({ api: { baseURL: "https://old.invalid" } })).toThrow();
     expect(() => parseProviderConfig({ modelIds: ["old"] })).toThrow();
   });
+  it("原生 ToolSearch 标记可选，经 Overlay、往返与 Registry 序列化保留", () => {
+    const config = parseProviderConfig({
+      group: "standard-personal",
+      access: access.toJSON(),
+      api: { ...api.toJSON(), supportsNativeToolSearch: true },
+      personalModelIds: ["custom"],
+    });
+    const result = createRegistryProviderConfig(config);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(serializeRegistryProviderConfig(result.config).api).toMatchObject({
+      supportsNativeToolSearch: true,
+    });
+    const renamed = config.overlay(parseProviderConfig({ api: { baseUrl: "https://next/v1" } }));
+    expect(renamed.api?.supportsNativeToolSearch).toBe(true);
+    const turnedOff = config.overlay(
+      parseProviderConfig({ api: { supportsNativeToolSearch: false } }),
+    );
+    expect(parseProviderConfig(turnedOff.toJSON()).api?.supportsNativeToolSearch).toBe(false);
+    expect(
+      createRegistryProviderConfig(parseProviderConfig({ ...config.toJSON(), api: api.toJSON() }))
+        .ok,
+    ).toBe(true);
+  });
   for (const scenario of cases) {
     const complete = { group: "standard-personal", access: scenario.access, api: api.toJSON() };
     it.each(

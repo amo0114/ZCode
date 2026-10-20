@@ -2255,9 +2255,9 @@ const zhCN: Record<string, string> = {
   "settings.integratedTerminalShell.auto": "自动选择",
   "settings.toolSearch": "工具搜索",
   "settings.toolSearchDescription":
-    "自动：按模型选择原生或本地搜索；本地：通过本地搜索按需加载工具；关闭：发送完整工具目录。新建会话或应用重启后恢复会话时生效，当前会话保持原设置。",
+    "自动：已标记支持原生工具搜索的渠道（设置 > 模型供应商）使用原生搜索，其余渠道使用本地搜索；本地：通过本地搜索按需加载工具；关闭：发送完整工具目录。新建会话或应用重启后恢复会话时生效，当前会话保持原设置。",
   "settings.toolSearchExperimentalNotice":
-    "实验性功能。若模型供应商未完整支持原生 ToolSearch，使用原生模式可能导致缓存失效并增加 Token 用量。",
+    "实验性功能。已标记支持原生 ToolSearch 的渠道若拒绝请求，会自动改用本地搜索；若中转静默丢弃该能力，可能导致缓存失效并增加 Token 用量。",
   "settings.toolSearch.auto": "自动",
   "settings.toolSearch.local": "本地",
   "settings.toolSearch.off": "关闭",
@@ -2853,6 +2853,13 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.readOnlyField": "{field}（只读）",
   "settings.modelProvider.endpointPath": "接口路径：{format}",
   "settings.modelProvider.apiFormat": "API 格式",
+  "settings.modelProvider.nativeToolSearch": "原生工具搜索",
+  "settings.modelProvider.nativeToolSearchDescription":
+    "端点透传 Anthropic ToolSearch beta 时开启（如中转到官方 API）。工具搜索为「自动」时，此渠道将使用原生搜索。",
+  "settings.modelProvider.nativeToolSearchProbe": "检测",
+  "settings.modelProvider.nativeToolSearchSupported": "端点接受原生工具搜索，已开启。",
+  "settings.modelProvider.nativeToolSearchUnsupported": "端点拒绝原生工具搜索，已关闭。{detail}",
+  "settings.modelProvider.nativeToolSearchProbeError": "检测失败：{error}",
   "settings.modelProvider.apiFormat.chatCompletions": "Chat Completions (/v1/chat/completions)",
   "settings.modelProvider.apiFormat.responses": "Responses (/responses)",
   "settings.modelProvider.apiFormat.anthropicMessages":

@@ -1,4 +1,4 @@
-import type { ModelConfigObject } from "@zcode/provider";
+import type { ModelConfigObject, ProviderApiType } from "@zcode/provider";
 import type { ModelSelectionView } from "@zcode/services";
 import { encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
 
@@ -17,6 +17,21 @@ export function isValidCustomProviderBaseUrl(value: string): boolean {
 const GENERIC_HOST_LABELS = new Set(["api", "www"]);
 
 /** 用户未填名称时取域名主体作默认名（api.deepseek.com → deepseek），避免模型选择器里出现整段域名。 */
+/** 自定义渠道的 api 配置；原生 ToolSearch 只对 Anthropic 格式且经用户确认或检测通过时写入。 */
+export function buildCustomProviderApiConfig(input: {
+  apiType: ProviderApiType;
+  baseUrl: string;
+  nativeToolSearch: boolean;
+}): { type: ProviderApiType; baseUrl: string; supportsNativeToolSearch?: true } {
+  return {
+    type: input.apiType,
+    baseUrl: input.baseUrl.trim(),
+    ...(input.apiType === "anthropic-messages" && input.nativeToolSearch
+      ? { supportsNativeToolSearch: true as const }
+      : {}),
+  };
+}
+
 export function resolveCustomProviderName(baseUrl: string): string | undefined {
   if (!isValidCustomProviderBaseUrl(baseUrl)) return undefined;
   const hostname = new URL(baseUrl.trim()).hostname;

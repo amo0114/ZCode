@@ -39,7 +39,11 @@ import {
   type AiSdkModelTextRequest,
   type ResolvedAiSdkModel,
 } from "./runner-runtime.js";
-import { resolveToolSearchCapability } from "./tool-search.js";
+import {
+  isNativeToolSearchRejection,
+  markNativeToolSearchRejected,
+  resolveToolSearchCapability,
+} from "./tool-search.js";
 import { createModel, type ModelExecutionRequest } from "./model.js";
 
 export type { AiSdkModelRetryOptions } from "./retry-policy.js";
@@ -189,7 +193,7 @@ export class AiSdkModelAdapter {
     };
     return createModel({
       requestCapabilities: {
-        toolSearch: resolveToolSearchCapability(options.providerConfig.api.type),
+        toolSearch: resolveToolSearchCapability(options.providerId, options.providerConfig.api),
       },
       providerId: resolved.providerId,
       modelId: resolved.modelId,
@@ -201,24 +205,81 @@ export class AiSdkModelAdapter {
       },
       options: options.options,
       executor: {
-        generateText: (request) => {
-          const legacyRequest = toLegacyRequest(request);
-          return this.generateTextWithResolved(
-            legacyRequest,
+        generateText: (request) =>
+          this.generateTextWithToolSearchFallback(
+            toLegacyRequest(request),
             resolved,
             resolveForRequest(request.options),
-          );
-        },
-        streamText: (request) => {
-          const legacyRequest = toLegacyRequest(request);
-          return this.streamTextWithResolved(
-            legacyRequest,
+            options,
+          ),
+        streamText: (request) =>
+          this.streamTextWithToolSearchFallback(
+            toLegacyRequest(request),
             resolved,
             resolveForRequest(request.options),
-          );
-        },
+            options,
+          ),
       },
     });
+  }
+
+  private async generateTextWithToolSearchFallback(
+    request: AiSdkModelTextRequest,
+    resolved: ResolvedAiSdkModel,
+    resolveModel: () => ResolvedAiSdkModel,
+    options: CreateAiSdkModelOptions,
+  ): Promise<ModelTextResult> {
+    try {
+      return await this.generateTextWithResolved(request, resolved, resolveModel);
+    } catch (error) {
+      if (!this.downgradeNativeToolSearch(request, error, options)) throw error;
+      return this.generateTextWithResolved(
+        { ...request, toolSearchEnabled: false },
+        resolved,
+        resolveModel,
+      );
+    }
+  }
+
+  private async *streamTextWithToolSearchFallback(
+    request: AiSdkModelTextRequest,
+    resolved: ResolvedAiSdkModel,
+    resolveModel: () => ResolvedAiSdkModel,
+    options: CreateAiSdkModelOptions,
+  ): AsyncGenerator<ModelStreamEvent> {
+    let emitted = false;
+    try {
+      for await (const event of this.streamTextWithResolved(request, resolved, resolveModel)) {
+        emitted = true;
+        yield event;
+      }
+    } catch (error) {
+      // 已向上游交付事件后不能重发同一请求；拒绝发生在响应开始前，此时尚无事件。
+      if (emitted || !this.downgradeNativeToolSearch(request, error, options)) throw error;
+      yield* this.streamTextWithResolved(
+        { ...request, toolSearchEnabled: false },
+        resolved,
+        resolveModel,
+      );
+    }
+  }
+
+  /**
+   * 原生 ToolSearch 被端点拒绝时，记录该渠道并允许本次请求以非原生形态重发：关闭后
+   * defer_loading、beta 头与 tool_reference 都会退化为普通请求；后续 step 由 auto 改走 local。
+   */
+  private downgradeNativeToolSearch(
+    request: AiSdkModelTextRequest,
+    error: unknown,
+    options: CreateAiSdkModelOptions,
+  ): boolean {
+    if (!request.toolSearchEnabled || !isNativeToolSearchRejection(error)) return false;
+    markNativeToolSearchRejected(options.providerId, options.providerConfig.api.baseUrl);
+    this.logger?.warn("Native ToolSearch rejected by provider; falling back to local ToolSearch", {
+      providerId: options.providerId,
+      modelId: options.modelId,
+    });
+    return true;
   }
 
   private generateTextWithResolved(

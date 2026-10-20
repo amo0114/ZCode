@@ -45,6 +45,7 @@ import { useServices } from "@/hooks/useServices.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
 import {
+  buildCustomProviderApiConfig,
   buildLoginApiKeyDefaultModelPreferenceFromSelection,
   isValidCustomProviderBaseUrl,
   LOGIN_CUSTOM_PROVIDER_VALUE,
@@ -54,6 +55,7 @@ import {
 } from "@/login/LoginApiKeyForm.helpers.js";
 import { ProviderApiFormatSelect } from "@/settings/model-provider-section/ProviderApiFormatSelect.js";
 import { ProviderLogo } from "@/settings/model-provider-section/ProviderLogo.js";
+import { ProviderNativeToolSearchSection } from "@/settings/model-provider-section/ProviderNativeToolSearchSection.js";
 import { selectNewProviderTemplates } from "@/settings/model-provider-section/newProviderTemplates.js";
 import { useZCodeStore } from "@/store/StoreProvider.js";
 
@@ -75,6 +77,7 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   const [customBaseUrl, setCustomBaseUrl] = useState("");
   const [customModelId, setCustomModelId] = useState("");
   const [customName, setCustomName] = useState("");
+  const [customNativeToolSearch, setCustomNativeToolSearch] = useState(false);
   const [recommendedModelConfig, setRecommendedModelConfig] =
     useState<RecommendedModelConfig | null>(null);
   const [remoteModels, setRemoteModels] = useState<readonly string[]>([]);
@@ -106,6 +109,15 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
 
   const customBaseUrlValid = isValidCustomProviderBaseUrl(customBaseUrl);
   const trimmedCustomModelId = customModelId.trim();
+  const customSupportsNativeToolSearchOption = isCustom && customApiFormat === "anthropic-messages";
+  // 检测结论只对当时的端点成立；地址或格式变化后回到未确认状态。
+  useEffect(() => {
+    setCustomNativeToolSearch(false);
+  }, [customApiFormat, customBaseUrl]);
+  const customNativeToolSearchProbeInput =
+    customBaseUrlValid && apiKeyValue.trim() && trimmedCustomModelId
+      ? { baseUrl: customBaseUrl.trim(), apiKey: apiKeyValue.trim(), modelId: trimmedCustomModelId }
+      : null;
   useEffect(() => {
     setRecommendedModelConfig(null);
     if (!isCustom || !customBaseUrlValid || !trimmedCustomModelId) return;
@@ -199,7 +211,11 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
     const created = await providerSettingsService.createPersonalProvider({
       providerName: customName.trim() || derivedCustomName,
       initialConfig: {
-        api: { type: customApiFormat, baseUrl: customBaseUrl.trim() },
+        api: buildCustomProviderApiConfig({
+          apiType: customApiFormat,
+          baseUrl: customBaseUrl,
+          nativeToolSearch: customNativeToolSearch,
+        }),
         access: { type: "api-key", apiKey },
       },
     });
@@ -537,6 +553,16 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
                 { summary: formatCapabilitySummary(recommendedModelConfig.config) },
               )}
             </p>
+          ) : null}
+          {customSupportsNativeToolSearchOption ? (
+            <ProviderNativeToolSearchSection
+              // 端点变化时重置检测提示，避免沿用对旧地址的结论。
+              key={`${customApiFormat}\n${customBaseUrl.trim()}`}
+              checked={customNativeToolSearch}
+              saving={saving}
+              probeInput={customNativeToolSearchProbeInput}
+              onCheckedChange={async (enabled) => setCustomNativeToolSearch(enabled)}
+            />
           ) : null}
         </div>
       </div>

@@ -22,6 +22,10 @@ import { createServiceDescriptor } from "../descriptors.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
 import { createServiceLogger } from "../logger/serviceLogger.js";
 import type { ListRemoteModelsInput } from "./remoteModelList.js";
+import type {
+  NativeToolSearchProbeResult,
+  ProbeNativeToolSearchInput,
+} from "./nativeToolSearchProbe.js";
 
 export type {
   ProviderSettingsProviderView,
@@ -76,6 +80,8 @@ export interface IProviderSettingsService {
   ): Promise<ModelConnectivityResult>;
   /** 用尚未保存的 Base URL / API Key 拉取远端模型 ID 列表，供新建自定义 Provider 时挑选。 */
   listRemoteModels(input: ListRemoteModelsInput): Promise<readonly string[]>;
+  /** 探测 Anthropic 兼容端点是否支持原生 ToolSearch，结果由用户确认后写入 Provider 配置。 */
+  probeNativeToolSearch(input: ProbeNativeToolSearchInput): Promise<NativeToolSearchProbeResult>;
 }
 
 export const IProviderSettingsService = createServiceDescriptor<IProviderSettingsService>(
@@ -119,6 +125,9 @@ export function createProviderSettingsService(
   ensureReady: () => Promise<void> = async () => {},
   testConnectivity?: ProviderSettingsConnectivityTester,
   listRemoteModels?: (input: ListRemoteModelsInput) => Promise<readonly string[]>,
+  probeNativeToolSearch?: (
+    input: ProbeNativeToolSearchInput,
+  ) => Promise<NativeToolSearchProbeResult>,
 ): IProviderSettingsService {
   return {
     onDidChange: toEvent((listener) => facade.onDidChange(listener)),
@@ -183,6 +192,12 @@ export function createProviderSettingsService(
         throw new Error("当前 Environment 未装配远端模型列表能力");
       }
       return listRemoteModels(input);
+    },
+    probeNativeToolSearch: async (input) => {
+      if (!probeNativeToolSearch) {
+        throw new Error("当前 Environment 未装配原生 ToolSearch 探测能力");
+      }
+      return probeNativeToolSearch(input);
     },
     testModelConnectivity: async (input) => {
       await ensureReady();

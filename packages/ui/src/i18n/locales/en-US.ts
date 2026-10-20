@@ -2395,9 +2395,9 @@ const enUS: Record<string, string> = {
   "settings.integratedTerminalShell.auto": "Auto",
   "settings.toolSearch": "Tool search",
   "settings.toolSearchDescription":
-    "Auto selects native or local search for the model. Local loads tools on demand. Off sends the full tool catalog. Applies to new sessions and sessions restored after an app restart; active sessions keep their settings.",
+    "Auto uses native search on providers marked as supporting it (Settings > Model providers) and local search elsewhere. Local loads tools on demand. Off sends the full tool catalog. Applies to new sessions and sessions restored after an app restart; active sessions keep their settings.",
   "settings.toolSearchExperimentalNotice":
-    "Experimental feature. Using native mode with a model provider that does not fully support native ToolSearch may invalidate prompt caching and increase token usage.",
+    "Experimental feature. If a provider marked as supporting native ToolSearch rejects it, ZCode falls back to local search; a relay that silently drops it may invalidate prompt caching and increase token usage.",
   "settings.toolSearch.auto": "Auto",
   "settings.toolSearch.local": "Local",
   "settings.toolSearch.off": "Off",
@@ -3044,6 +3044,15 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.readOnlyField": "{field} (read only)",
   "settings.modelProvider.endpointPath": "Endpoint path: {format}",
   "settings.modelProvider.apiFormat": "API format",
+  "settings.modelProvider.nativeToolSearch": "Native tool search",
+  "settings.modelProvider.nativeToolSearchDescription":
+    "Turn on when this endpoint passes the Anthropic ToolSearch beta through (for example, a relay to the official API). With tool search set to Auto, this provider then uses native search.",
+  "settings.modelProvider.nativeToolSearchProbe": "Detect",
+  "settings.modelProvider.nativeToolSearchSupported":
+    "The endpoint accepted native tool search. Turned on.",
+  "settings.modelProvider.nativeToolSearchUnsupported":
+    "The endpoint rejected native tool search. Turned off. {detail}",
+  "settings.modelProvider.nativeToolSearchProbeError": "Detection failed: {error}",
   "settings.modelProvider.apiFormat.chatCompletions": "Chat completions (/v1/chat/completions)",
   "settings.modelProvider.apiFormat.responses": "Responses (/responses)",
   "settings.modelProvider.apiFormat.anthropicMessages":

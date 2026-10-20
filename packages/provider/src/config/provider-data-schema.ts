@@ -33,6 +33,8 @@ export const completeProviderApiDataSchema = z
     type: providerApiTypeDataSchema,
     baseUrl: nonBlankRequiredString.pipe(z.string().url()),
     headers: z.record(z.string(), z.string()).readonly().nullable().optional(),
+    /** 渠道是否支持 Anthropic 原生 ToolSearch（defer_loading / tool_reference）；仅用户确认或检测通过后为 true。 */
+    supportsNativeToolSearch: z.boolean().nullable().optional(),
   })
   .strict();
 export const providerApiDataSchema = z

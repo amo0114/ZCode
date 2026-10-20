@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCustomProviderApiConfig,
   buildLoginApiKeyDefaultModelPreferenceFromSelection,
   isValidCustomProviderBaseUrl,
   resolveCustomProviderName,
@@ -10,6 +11,35 @@ import {
 import { encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
 
 describe("LoginApiKeyForm provider update helpers", () => {
+  it("自定义渠道只在 Anthropic 格式且已确认时写入原生 ToolSearch 标记", () => {
+    expect(
+      buildCustomProviderApiConfig({
+        apiType: "anthropic-messages",
+        baseUrl: " https://relay.test ",
+        nativeToolSearch: true,
+      }),
+    ).toEqual({
+      type: "anthropic-messages",
+      baseUrl: "https://relay.test",
+      supportsNativeToolSearch: true,
+    });
+    expect(
+      buildCustomProviderApiConfig({
+        apiType: "anthropic-messages",
+        baseUrl: "https://relay.test",
+        nativeToolSearch: false,
+      }),
+    ).toEqual({ type: "anthropic-messages", baseUrl: "https://relay.test" });
+    // 切换到 OpenAI 格式后残留的确认不能写入。
+    expect(
+      buildCustomProviderApiConfig({
+        apiType: "openai-chat-completions",
+        baseUrl: "https://relay.test",
+        nativeToolSearch: true,
+      }),
+    ).toEqual({ type: "openai-chat-completions", baseUrl: "https://relay.test" });
+  });
+
   it("只有输入框为空且 provider 有 URL 时展示获取 API key 链接", () => {
     expect(shouldShowLoginApiKeyLink("", "https://z.ai/manage-apikey/apikey-list")).toBe(true);
     expect(shouldShowLoginApiKeyLink(" sk-login ", "https://z.ai/manage-apikey/apikey-list")).toBe(

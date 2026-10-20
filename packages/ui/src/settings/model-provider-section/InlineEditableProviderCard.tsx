@@ -25,6 +25,7 @@ import {
   ProviderModelsSection,
 } from "./ProviderCardSections.js";
 import { useProviderDetailFeedback } from "./ProviderDetailFeedback.js";
+import { ProviderNativeToolSearchSection } from "./ProviderNativeToolSearchSection.js";
 import { MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS, useIdleTrigger } from "./useIdleTrigger.js";
 import { useOptimisticReorder } from "./useOptimisticReorder.js";
 
@@ -187,6 +188,7 @@ export function InlineEditableProviderCard({
   const [apiKeyValue, setApiKeyValue] = useState(getProviderFormApiKey(provider));
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [savingEnabled, setSavingEnabled] = useState(false);
+  const [savingNativeToolSearch, setSavingNativeToolSearch] = useState(false);
   const authoritativeModels = useMemo(
     () => resolveVisibleProviderModelsForEdit(provider),
     [provider],
@@ -460,6 +462,41 @@ export function InlineEditableProviderCard({
       setSavingEnabled(false);
     }
   };
+
+  const handleNativeToolSearchChange = async (enabled: boolean) => {
+    if (savingNativeToolSearch) return;
+    cancelIdleDraftSave();
+    setSavingNativeToolSearch(true);
+    // 与启用开关相同：带上未提交的连接草稿，只改 api 上这一个叶子，不重建隐藏 headers。
+    const draft =
+      resolvePendingProviderDraftSave({
+        provider,
+        draft: draftRef.current,
+        readOnlyEndpoints,
+        now: Date.now,
+      }) ?? provider;
+    try {
+      await saveProviderWithCleanupGuard({
+        ...draft,
+        config: {
+          ...draft.config,
+          api: { ...draft.config.api, supportsNativeToolSearch: enabled },
+        },
+        personalConfig: {
+          ...draft.personalConfig,
+          api: { ...draft.personalConfig.api, supportsNativeToolSearch: enabled },
+        },
+      });
+    } finally {
+      setSavingNativeToolSearch(false);
+    }
+  };
+  const nativeToolSearchProbeInput = (() => {
+    const baseUrl = baseUrlValue.trim();
+    const apiKey = apiKeyValue.trim();
+    const modelId = models[0]?.modelId;
+    return baseUrl && apiKey && modelId ? { baseUrl, apiKey, modelId } : null;
+  })();
 
   useEffect(() => {
     return () => {
@@ -807,6 +844,15 @@ export function InlineEditableProviderCard({
           onBaseUrlCompositionStart={handleTechnicalInputCompositionStart}
           onBaseUrlCompositionEnd={handleTechnicalInputCompositionEnd}
         />
+
+        {apiFormat === "anthropic-messages" ? (
+          <ProviderNativeToolSearchSection
+            checked={provider.config.api?.supportsNativeToolSearch === true}
+            saving={savingNativeToolSearch}
+            probeInput={nativeToolSearchProbeInput}
+            onCheckedChange={handleNativeToolSearchChange}
+          />
+        ) : null}
 
         {isApiKeyProvider ? (
           <ProviderApiKeySection

@@ -46,6 +46,9 @@ export function serializeRegistryProviderConfig(
       type: config.api.type,
       baseUrl: config.api.baseUrl,
       ...(config.api.headers == null ? {} : { headers: config.api.headers }),
+      ...(config.api.supportsNativeToolSearch == null
+        ? {}
+        : { supportsNativeToolSearch: config.api.supportsNativeToolSearch }),
     },
     ...(config.builtinModelIds == null ? {} : { builtinModelIds: [...config.builtinModelIds] }),
     ...(config.personalModelIds == null ? {} : { personalModelIds: [...config.personalModelIds] }),

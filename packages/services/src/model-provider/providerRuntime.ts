@@ -21,6 +21,10 @@ import {
   type ProviderSettingsConnectivityTester,
 } from "./providerFacadeServices.js";
 import type { ListRemoteModelsInput } from "./remoteModelList.js";
+import type {
+  NativeToolSearchProbeResult,
+  ProbeNativeToolSearchInput,
+} from "./nativeToolSearchProbe.js";
 
 export interface ProviderRuntimeOptions extends ProviderConfigRuntimeOptions {
   readonly testConnectivity?: ProviderSettingsConnectivityTester;
@@ -30,6 +34,9 @@ export interface ProviderRuntimeDependencies {
   readonly configRuntime: ProviderConfigRuntime;
   readonly testConnectivity?: ProviderSettingsConnectivityTester;
   readonly listRemoteModels?: (input: ListRemoteModelsInput) => Promise<readonly string[]>;
+  readonly probeNativeToolSearch?: (
+    input: ProbeNativeToolSearchInput,
+  ) => Promise<NativeToolSearchProbeResult>;
   readonly modelSelectionConfiguredDefaultSource?: ModelSelectionConfiguredDefaultSource;
   readonly disposeModelSelectionConfiguredDefaultSource?: () => void;
 }
@@ -60,6 +67,7 @@ export class ProviderRuntime {
       ensureReady,
       dependencies.testConnectivity,
       dependencies.listRemoteModels,
+      dependencies.probeNativeToolSearch,
     );
     this.#modelSelectionRuntime = createModelSelectionService(
       createNodeModelSelectionFacade(this.registryService),
