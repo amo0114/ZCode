@@ -13,6 +13,8 @@ import {
 } from "@zcode/provider-node";
 import {
   TID_COMPOSER_WORKSPACE_TRIGGER,
+  TID_LOGIN_API_KEY_PROVIDER_ITEM,
+  TID_LOGIN_API_KEY_PROVIDER_TRIGGER,
   TID_V4_SESSION_PANE,
   TID_WORKSPACE_ITEM,
   TID_WORKSPACE_PATH,
@@ -222,6 +224,25 @@ export async function waitForTestIdByDom(
     timeout,
     timeoutMsg,
   });
+}
+
+/**
+ * 欢迎页 API Key 表单不再按语言预选供应商，填写前必须显式选择 Template。
+ * Radix Select 由 pointer 事件打开，只能用 WebDriver 真实点击。
+ */
+export async function selectLoginApiKeyProvider(templateId = "bigmodel-standard-api") {
+  const trigger = await $(sel(TID_LOGIN_API_KEY_PROVIDER_TRIGGER));
+  await trigger.waitForClickable({
+    timeout: 15000,
+    timeoutMsg: "API Key 供应商下拉框没有变为可用",
+  });
+  await trigger.click();
+  const item = await $(sel(testId(TID_LOGIN_API_KEY_PROVIDER_ITEM, templateId)));
+  await item.waitForDisplayed({
+    timeout: 15000,
+    timeoutMsg: `API Key 供应商下拉框里没有 ${templateId}`,
+  });
+  await item.click();
 }
 
 export async function clickTestIdByDom(

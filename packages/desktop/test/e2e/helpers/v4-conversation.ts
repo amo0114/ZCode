@@ -65,6 +65,7 @@ import {
 } from "@zcode/shared";
 import {
   clickTestIdByDom,
+  selectLoginApiKeyProvider,
   dispatchMouseDownByExactTestId,
   setInputValueByTestIdDom,
   waitForDefaultWorkspaceReady,
@@ -179,6 +180,7 @@ export async function loginWithApiKey() {
     timeout: 30000,
     timeoutMsg: "欢迎页没有出现 API Key 登录入口",
   });
+  await selectLoginApiKeyProvider();
   await setInputValueByTestIdDom(TID_LOGIN_API_KEY_INPUT, LOGIN_API_KEY, {
     timeout: 15000,
     timeoutMsg: "API Key 登录输入框没有出现",

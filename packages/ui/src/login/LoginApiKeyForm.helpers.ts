@@ -1,23 +1,5 @@
-import type { Locale } from "@zcode/shared";
 import type { ModelSelectionView } from "@zcode/services";
 import { encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
-
-export type ApiKeyProviderChoice = "zai" | "bigmodel";
-
-export function resolveLoginApiKeyDefaultProvider(locale: Locale): ApiKeyProviderChoice {
-  return locale === "zh-CN" ? "bigmodel" : "zai";
-}
-
-export function resolveLoginApiKeyTemplateId(
-  choice: ApiKeyProviderChoice,
-): "zai-standard-api" | "bigmodel-standard-api" {
-  return choice === "zai" ? "zai-standard-api" : "bigmodel-standard-api";
-}
-
-export function resolveLoginApiKeyProviderLabel(choice: ApiKeyProviderChoice): string {
-  // Welcome Screen API Key 错误提示需要使用 BigModel 品牌固定写法。
-  return choice === "zai" ? "Z.ai" : "BigModel";
-}
 
 export function shouldShowLoginApiKeyLink(
   apiKeyValue: string,
