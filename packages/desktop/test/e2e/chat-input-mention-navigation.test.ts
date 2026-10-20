@@ -57,6 +57,10 @@ describe("chat input mention navigation", () => {
       timeout: 15000,
     });
     await waitForPluginOption();
+    // 首次输入会创建 deferred session；绑定后 Plugin catalog 从 workspace 切到 session 作用域并重新加载。
+    // 该切换发生在 Agent 就绪后约 1–2s，启动更快时会落进下面的探测窗口，因此先等绑定完成再探测。
+    await waitForComposerSessionBound();
+    await waitForPluginOption();
     await startPluginOptionStabilityProbe();
 
     await browser.keys("ArrowLeft");
@@ -81,6 +85,23 @@ describe("chat input mention navigation", () => {
     );
   });
 });
+
+async function waitForComposerSessionBound() {
+  await browser.waitUntil(
+    async () =>
+      browser.execute((inputTestId) => {
+        const pane =
+          document.querySelector(`[data-testid="${inputTestId}"]`)?.closest("[data-session-id]") ??
+          document.querySelector("[data-session-id]");
+        const sessionId = pane?.getAttribute("data-session-id");
+        return Boolean(sessionId && sessionId !== "draft");
+      }, TID_V4_COMPOSER_INPUT),
+    {
+      timeout: 30000,
+      timeoutMsg: "Composer 输入后 deferred session 没有完成绑定",
+    },
+  );
+}
 
 async function waitForPluginOption() {
   await browser.waitUntil(
