@@ -53,7 +53,8 @@ describe("CDD01：修改数据存储路径后原任务仍可继续", () => {
   after(async () => {
     await browser.electron.restoreAllMocks();
     await clearAppData();
-    await rm(customDataBaseDir, { force: true, recursive: true });
+    // App 退出后 provider runtime 可能仍在新根下落盘，删除目录需容忍短暂的 ENOTEMPTY。
+    await rm(customDataBaseDir, { force: true, recursive: true, maxRetries: 5, retryDelay: 500 });
     await rm(projectCanary, { force: true });
   });
 
