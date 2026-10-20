@@ -32,10 +32,13 @@ describe("side pane toggle empty state", () => {
     expect(source).toContain('id: "sidePane.openTab"');
     expect(source).toContain('id: "sidePane.openTabDescription"');
     expect(source).toContain("hasRenderedSidePane ? (");
-    expect(source).toContain("visibleTabs.length === 0 ? openTabLauncher : null");
+    // 完整视图中空状态由对话 tab 占据，启动器改在内容区内渲染。
+    expect(source).toContain("visibleTabs.length === 0 && !fullView ? openTabLauncher : null");
     // 截图 surface prepare 期间，即使当前对话没有可见 tab，也要保留后台 browser-use
     // 的实际布局，不能回退为 display:none。
-    expect(source).toContain('visibleTabs.length === 0 && !screenshotSurfaceRequest && "hidden"');
+    expect(source).toContain(
+      'visibleTabs.length === 0 && !screenshotSurfaceRequest && !fullView && "hidden"',
+    );
     expect(source).toContain("保留 TabsContent 挂载");
     expect(source).toContain("openTabLauncher");
     expect(source).toContain("flex-1 items-center justify-center");

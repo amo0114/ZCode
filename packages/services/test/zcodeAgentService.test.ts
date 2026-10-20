@@ -2009,6 +2009,7 @@ describe("createZCodeAgentService", () => {
             askUserQuestionAutoResolutionEnabled: boolean;
             nativeSearchEnhancementsEnabled: boolean;
             memoryEnabled: boolean;
+            toolSearchMode?: "auto" | "local" | "off";
           }>
         >
       >;
@@ -2017,6 +2018,7 @@ describe("createZCodeAgentService", () => {
         nativeSearchEnhancementsEnabled: boolean;
         subagentRuntimeConfigEnabled: boolean;
         memoryEnabled: boolean;
+        toolSearchMode?: "auto" | "local" | "off";
         modelContextBudgetStrategy: "legacy" | "preflight-v1";
       };
       expectedErrorCode?: number;
@@ -2025,11 +2027,13 @@ describe("createZCodeAgentService", () => {
       {
         name: "current-setting",
         resolver: vi.fn(async () => ({
+          toolSearchMode: "auto",
           askUserQuestionAutoResolutionEnabled: false,
           nativeSearchEnhancementsEnabled: false,
           memoryEnabled: false,
         })),
         expectedResult: {
+          toolSearchMode: "auto",
           askUserQuestionAutoResolutionEnabled: false,
           nativeSearchEnhancementsEnabled: false,
           subagentRuntimeConfigEnabled: false,
@@ -2041,6 +2045,7 @@ describe("createZCodeAgentService", () => {
       {
         name: "missing-resolver",
         expectedResult: {
+          toolSearchMode: "off",
           askUserQuestionAutoResolutionEnabled: true,
           nativeSearchEnhancementsEnabled: true,
           subagentRuntimeConfigEnabled: false,
@@ -2101,6 +2106,7 @@ describe("createZCodeAgentService", () => {
                   nativeSearchEnhancementsEnabled: boolean;
                   subagentRuntimeConfigEnabled: boolean;
                   memoryEnabled: boolean;
+                  toolSearchMode?: "auto" | "local" | "off";
                   modelContextBudgetStrategy: "legacy" | "preflight-v1";
                 };
               },
