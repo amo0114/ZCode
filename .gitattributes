@@ -11,6 +11,8 @@ THIRD-PARTY-NOTICES.md -text -whitespace conflict-marker-size=32 linguist-genera
 third-party/upstream/** -text -whitespace
 third-party/native-search/licenses/** -text -whitespace
 third-party/runtime/*.txt -text -whitespace
+# Gen UI 离线 vendor 构建时按 sha256 校验，Windows autocrlf 改换行会导致哈希不符。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/** -text
 docs/knip/docs/LICENSE -text -whitespace
 docs/knip/docs/licenses/** -text -whitespace
 third-party/inventory.json linguist-generated=true
