@@ -227,7 +227,14 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
                   placeholder={intl.formatMessage({ id: "login.apiKey.selectProvider" })}
                 />
               </SelectTrigger>
-              <SelectContent align="end" className="rounded-lg">
+              {/* 选项多达近 20 个，item-aligned 会盖住触发器并随选中项上下跳动，改为在触发器下方弹出。 */}
+              <SelectContent
+                position="popper"
+                side="bottom"
+                sideOffset={4}
+                collisionPadding={16}
+                className="max-h-80 rounded-lg"
+              >
                 {apiKeyTemplates.map((template) => (
                   <SelectItem
                     key={template.templateId}
