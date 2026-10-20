@@ -1,3 +1,4 @@
+import type { ModelConfigObject } from "@zcode/provider";
 import type { ModelSelectionView } from "@zcode/services";
 import { encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
 
@@ -13,9 +14,51 @@ export function isValidCustomProviderBaseUrl(value: string): boolean {
   }
 }
 
-/** 自定义供应商以站点域名命名，便于在模型选择器里区分多个自定义站点。 */
+const GENERIC_HOST_LABELS = new Set(["api", "www"]);
+
+/** 用户未填名称时取域名主体作默认名（api.deepseek.com → deepseek），避免模型选择器里出现整段域名。 */
 export function resolveCustomProviderName(baseUrl: string): string | undefined {
-  return isValidCustomProviderBaseUrl(baseUrl) ? new URL(baseUrl.trim()).hostname : undefined;
+  if (!isValidCustomProviderBaseUrl(baseUrl)) return undefined;
+  const hostname = new URL(baseUrl.trim()).hostname;
+  // IP 与单段主机名（localhost）没有可提取的主体，原样使用。
+  if (/^[\d.]+$/.test(hostname) || hostname.startsWith("[") || !hostname.includes(".")) {
+    return hostname;
+  }
+  const labels = hostname.split(".");
+  while (labels.length > 2 && GENERIC_HOST_LABELS.has(labels[0]!)) labels.shift();
+  return labels[0];
+}
+
+export interface RecommendedModelConfigSummary {
+  readonly contextWindow?: string;
+  readonly maxOutputTokens?: string;
+  readonly reasoningLevels: number;
+  readonly supportsToolCall: boolean;
+  readonly supportsImage: boolean;
+}
+
+function formatTokenCount(value: number): string {
+  if (value >= 1_000_000) return `${Number((value / 1_000_000).toFixed(1))}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
+  return String(value);
+}
+
+export function summarizeRecommendedModelConfig(
+  config: ModelConfigObject,
+): RecommendedModelConfigSummary {
+  const contextWindow = config.properties?.contextWindow;
+  const maxOutputTokens = config.optionSpecs?.maxOutputTokens?.max;
+  return {
+    ...(typeof contextWindow === "number" ? { contextWindow: formatTokenCount(contextWindow) } : {}),
+    ...(typeof maxOutputTokens === "number"
+      ? { maxOutputTokens: formatTokenCount(maxOutputTokens) }
+      : {}),
+    reasoningLevels: (config.optionSpecs?.reasoningLevel?.values ?? []).filter(
+      (level) => level !== "disabled",
+    ).length,
+    supportsToolCall: config.properties?.supportsToolCall !== false,
+    supportsImage: config.properties?.inputFormat?.supportsImage === true,
+  };
 }
 
 export function shouldShowLoginApiKeyLink(

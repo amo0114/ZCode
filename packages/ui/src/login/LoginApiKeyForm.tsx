@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   isApiKeyAccess,
   resolveProviderTemplateName,
   type ProviderApiType,
+  type RecommendedModelConfig,
 } from "@zcode/provider";
 import { Loader2Icon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import {
@@ -12,7 +13,9 @@ import {
   TID_LOGIN_API_KEY_CONTINUE_BUTTON,
   TID_LOGIN_API_KEY_ERROR,
   TID_LOGIN_API_KEY_INPUT,
+  TID_LOGIN_API_KEY_MODEL_CAPABILITY,
   TID_LOGIN_API_KEY_MODEL_INPUT,
+  TID_LOGIN_API_KEY_NAME_INPUT,
   TID_LOGIN_API_KEY_PROVIDER_ITEM,
   TID_LOGIN_API_KEY_PROVIDER_TRIGGER,
   TID_LOGIN_API_KEY_SKIP_BUTTON,
@@ -47,6 +50,7 @@ import {
   LOGIN_CUSTOM_PROVIDER_VALUE,
   resolveCustomProviderName,
   shouldShowLoginApiKeyLink,
+  summarizeRecommendedModelConfig,
 } from "@/login/LoginApiKeyForm.helpers.js";
 import { ProviderApiFormatSelect } from "@/settings/model-provider-section/ProviderApiFormatSelect.js";
 import { ProviderLogo } from "@/settings/model-provider-section/ProviderLogo.js";
@@ -70,6 +74,9 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   const [customApiFormat, setCustomApiFormat] = useState<ProviderApiType>("openai-chat-completions");
   const [customBaseUrl, setCustomBaseUrl] = useState("");
   const [customModelId, setCustomModelId] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [recommendedModelConfig, setRecommendedModelConfig] =
+    useState<RecommendedModelConfig | null>(null);
   const [remoteModels, setRemoteModels] = useState<readonly string[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -96,6 +103,71 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   const apiKeyUrl = isApiKeyAccess(templateAccess) ? templateAccess.apiKeyManagementUrl : undefined;
   // 用户已经输入或回填 API Key 后，右侧获取入口会挤占密码输入区域。
   const showApiKeyLink = shouldShowLoginApiKeyLink(apiKeyValue, apiKeyUrl ?? undefined);
+
+  const customBaseUrlValid = isValidCustomProviderBaseUrl(customBaseUrl);
+  const trimmedCustomModelId = customModelId.trim();
+  useEffect(() => {
+    setRecommendedModelConfig(null);
+    if (!isCustom || !customBaseUrlValid || !trimmedCustomModelId) return;
+    let cancelled = false;
+    // 输入模型 ID 时逐字触发，防抖后再解析，避免每个按键都走一次 RPC。
+    const timer = setTimeout(() => {
+      providerSettingsService
+        .resolveRecommendedModelConfig({
+          apiType: customApiFormat,
+          baseUrl: customBaseUrl.trim(),
+          modelId: trimmedCustomModelId,
+        })
+        .then((result) => {
+          if (!cancelled) setRecommendedModelConfig(result);
+        })
+        .catch((resolveError) => {
+          logger.warn("[LoginEntry] 解析自定义模型推荐配置失败", { error: resolveError });
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    customApiFormat,
+    customBaseUrl,
+    customBaseUrlValid,
+    isCustom,
+    providerSettingsService,
+    trimmedCustomModelId,
+  ]);
+
+  const formatCapabilitySummary = (config: RecommendedModelConfig["config"]) => {
+    const summary = summarizeRecommendedModelConfig(config);
+    return [
+      summary.contextWindow
+        ? intl.formatMessage(
+            { id: "login.apiKey.capability.context" },
+            { value: summary.contextWindow },
+          )
+        : null,
+      summary.maxOutputTokens
+        ? intl.formatMessage(
+            { id: "login.apiKey.capability.maxOutput" },
+            { value: summary.maxOutputTokens },
+          )
+        : null,
+      summary.reasoningLevels > 0
+        ? intl.formatMessage(
+            { id: "login.apiKey.capability.reasoning" },
+            { count: summary.reasoningLevels },
+          )
+        : intl.formatMessage({ id: "login.apiKey.capability.noReasoning" }),
+      summary.supportsImage ? intl.formatMessage({ id: "login.apiKey.capability.image" }) : null,
+      summary.supportsToolCall
+        ? null
+        : intl.formatMessage({ id: "login.apiKey.capability.noToolCall" }),
+    ]
+      .filter((item) => item !== null)
+      .join(" · ");
+  };
+  const derivedCustomName = resolveCustomProviderName(customBaseUrl);
 
   const canFetchModels =
     isValidCustomProviderBaseUrl(customBaseUrl) && apiKeyValue.trim().length > 0 && !fetchingModels;
@@ -125,7 +197,7 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
 
   const saveCustomProvider = async (apiKey: string) => {
     const created = await providerSettingsService.createPersonalProvider({
-      providerName: resolveCustomProviderName(customBaseUrl),
+      providerName: customName.trim() || derivedCustomName,
       initialConfig: {
         api: { type: customApiFormat, baseUrl: customBaseUrl.trim() },
         access: { type: "api-key", apiKey },
@@ -297,6 +369,26 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
           </div>
           {isCustom ? (
             <>
+              <Input
+                type="text"
+                size="lg"
+                className="h-10 w-full text-ui-base"
+                data-testid={TID_LOGIN_API_KEY_NAME_INPUT}
+                aria-label={intl.formatMessage({ id: "login.apiKey.customNamePlaceholder" })}
+                value={customName}
+                placeholder={
+                  derivedCustomName
+                    ? intl.formatMessage(
+                        { id: "login.apiKey.customNamePlaceholderWithDefault" },
+                        { name: derivedCustomName },
+                      )
+                    : intl.formatMessage({ id: "login.apiKey.customNamePlaceholder" })
+                }
+                autoComplete="off"
+                spellCheck={false}
+                disabled={busy}
+                onChange={(event) => setCustomName(event.target.value)}
+              />
               <ProviderApiFormatSelect value={customApiFormat} onChange={setCustomApiFormat} />
               <div className="space-y-1">
                 <Input
@@ -429,6 +521,22 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
                 </Command>
               </PopoverContent>
             </Popover>
+          ) : null}
+          {isCustom && recommendedModelConfig ? (
+            <p
+              className="text-ui-sm text-foreground-subtle"
+              data-testid={TID_LOGIN_API_KEY_MODEL_CAPABILITY}
+              data-recognized={recommendedModelConfig.recognized}
+            >
+              {intl.formatMessage(
+                {
+                  id: recommendedModelConfig.recognized
+                    ? "login.apiKey.modelRecognized"
+                    : "login.apiKey.modelUnrecognized",
+                },
+                { summary: formatCapabilitySummary(recommendedModelConfig.config) },
+              )}
+            </p>
           ) : null}
         </div>
       </div>

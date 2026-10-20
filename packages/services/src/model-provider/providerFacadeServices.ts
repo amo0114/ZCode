@@ -12,6 +12,8 @@ import {
   type ProviderSettingsFacade,
   type ProviderSettingsCreationResult,
   type ModelConfigResolution,
+  type RecommendedModelConfig,
+  type ResolveRecommendedModelConfigInput,
   type ProviderSettingsView,
   type ResolveModelConfigInput,
   type SavePersonalModelDraftInput,
@@ -36,6 +38,9 @@ export interface IProviderSettingsService {
     input?: Parameters<ProviderSettingsFacade["createPersonalProvider"]>[0],
   ): Promise<ProviderSettingsCreationResult>;
   resolveModelConfig(input: ResolveModelConfigInput): Promise<ModelConfigResolution>;
+  resolveRecommendedModelConfig(
+    input: ResolveRecommendedModelConfigInput,
+  ): Promise<RecommendedModelConfig>;
   savePersonalProviderOverlay(
     providerId: ProviderId,
     config: ProviderConfigObject,
@@ -132,6 +137,10 @@ export function createProviderSettingsService(
     resolveModelConfig: async (input) => {
       await ensureReady();
       return facade.resolveModelConfig(input);
+    },
+    resolveRecommendedModelConfig: async (input) => {
+      await ensureReady();
+      return facade.resolveRecommendedModelConfig(input);
     },
     savePersonalProviderOverlay: async (providerId, config, metadata) => {
       await ensureReady();

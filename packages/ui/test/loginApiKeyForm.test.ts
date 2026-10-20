@@ -5,6 +5,7 @@ import {
   resolveCustomProviderName,
   resolveHydratedLoginApiKeyValue,
   shouldShowLoginApiKeyLink,
+  summarizeRecommendedModelConfig,
 } from "@/login/LoginApiKeyForm.helpers.js";
 import { encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
 
@@ -61,7 +62,38 @@ describe("LoginApiKeyForm provider update helpers", () => {
     expect(isValidCustomProviderBaseUrl("http://localhost:8080")).toBe(true);
     expect(isValidCustomProviderBaseUrl("api.example.com/v1")).toBe(false);
     expect(isValidCustomProviderBaseUrl("ftp://api.example.com")).toBe(false);
-    expect(resolveCustomProviderName("https://api.example.com/v1")).toBe("api.example.com");
+    expect(resolveCustomProviderName("https://api.deepseek.com/v1")).toBe("deepseek");
+    expect(resolveCustomProviderName("https://openrouter.ai/api/v1")).toBe("openrouter");
+    expect(resolveCustomProviderName("https://my-relay.example.cn/v1")).toBe("my-relay");
+    expect(resolveCustomProviderName("http://localhost:8080/v1")).toBe("localhost");
+    expect(resolveCustomProviderName("http://127.0.0.1:8080/v1")).toBe("127.0.0.1");
     expect(resolveCustomProviderName("not a url")).toBeUndefined();
+  });
+
+  it("推荐配置摘要以 K/M 展示 token 数，并只统计非 disabled 的思考档位", () => {
+    expect(
+      summarizeRecommendedModelConfig({
+        properties: {
+          contextWindow: 1_048_576,
+          supportsToolCall: true,
+          inputFormat: { supportsImage: true },
+        },
+        optionSpecs: {
+          reasoningLevel: { values: ["disabled", "low", "high", "max"] },
+          maxOutputTokens: { max: 384_000 },
+        },
+      } as Parameters<typeof summarizeRecommendedModelConfig>[0]),
+    ).toEqual({
+      contextWindow: "1M",
+      maxOutputTokens: "384K",
+      reasoningLevels: 3,
+      supportsToolCall: true,
+      supportsImage: true,
+    });
+    expect(
+      summarizeRecommendedModelConfig({ properties: { supportsToolCall: false } } as Parameters<
+        typeof summarizeRecommendedModelConfig
+      >[0]),
+    ).toEqual({ reasoningLevels: 0, supportsToolCall: false, supportsImage: false });
   });
 });

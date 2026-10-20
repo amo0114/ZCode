@@ -5,6 +5,7 @@ import type {
   ModelConfig,
   ModelConfigObject,
   ModelId,
+  ProviderApiType,
   ProviderConfig,
   ProviderConfigObject,
   ProviderId,
@@ -124,6 +125,21 @@ export interface ModelConfigResolution {
   readonly issues: readonly ConfigValidationIssue[];
 }
 
+export interface ResolveRecommendedModelConfigInput {
+  readonly apiType: ProviderApiType;
+  readonly baseUrl: string;
+  readonly modelId: ModelId;
+}
+
+export interface RecommendedModelConfig {
+  readonly config: ModelConfigObject;
+  /** false 表示只命中通用兜底规则，上下文、输出与思考参数没有针对该模型校准。 */
+  readonly recognized: boolean;
+}
+
+// 任何具体模型规则都匹配不到的占位 ID；用它解析出的结果就是通用兜底配置。
+const UNRECOGNIZED_MODEL_PROBE_ID = "zcode-unrecognized-model-probe";
+
 export type ResolveModelConfigInput =
   | {
       readonly providerId: ProviderId;
@@ -231,6 +247,21 @@ export class ProviderSettingsFacade {
       await this.#source.refresh(reason);
     }
     return this.getView();
+  }
+
+  /** 新建自定义 Provider 前预览推荐配置：只看 Built-in 规则，不依赖已保存的 Provider。 */
+  resolveRecommendedModelConfig(input: ResolveRecommendedModelConfigInput): RecommendedModelConfig {
+    const rules = requireSnapshot(this.#source).config.zcodeBuiltinModelRules;
+    const resolve = (modelId: string) =>
+      rules
+        .resolve({ providerId: "", modelId, apiType: input.apiType, baseUrl: input.baseUrl })
+        .toJSON();
+    const config = resolve(input.modelId);
+    const fallback = resolve(UNRECOGNIZED_MODEL_PROBE_ID);
+    return Object.freeze({
+      config,
+      recognized: JSON.stringify(config) !== JSON.stringify(fallback),
+    });
   }
 
   resolveModelConfig(input: ResolveModelConfigInput): ModelConfigResolution {

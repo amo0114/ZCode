@@ -19,6 +19,10 @@ export const TID_LOGIN_API_KEY_PROVIDER_ITEM = "login-api-key-provider-item";
 export const TID_LOGIN_API_KEY_BASE_URL_INPUT = "login-api-key-base-url-input";
 /** API Key 登录自定义供应商模型 ID 输入框 */
 export const TID_LOGIN_API_KEY_MODEL_INPUT = "login-api-key-model-input";
+/** API Key 登录自定义供应商名称输入框 */
+export const TID_LOGIN_API_KEY_NAME_INPUT = "login-api-key-name-input";
+/** API Key 登录自定义供应商模型能力摘要 */
+export const TID_LOGIN_API_KEY_MODEL_CAPABILITY = "login-api-key-model-capability";
 /** API Key 登录自定义供应商「获取模型」按钮 */
 export const TID_LOGIN_API_KEY_FETCH_MODELS_BUTTON = "login-api-key-fetch-models-button";
 /** API Key 登录密钥输入框 */
