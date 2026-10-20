@@ -5,13 +5,26 @@
 import type { ContextSection } from "../types.js";
 import type { OutputStylePromptConfig } from "../types.js";
 import { estimateTokens } from "../utils.js";
+import {
+  OFFICIAL_NOTICE,
+  resolveBoundary,
+  type BoundaryModelRef,
+} from "../boundary-policy.js";
 
-const SECURITY_NOTICE =
-  "IMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes. Dual-use security tools (C2 frameworks, credential testing, exploit development) require clear authorization context: pentesting engagements, CTF competitions, security research, or defensive use cases.";
+/**
+ * 安全 IMPORTANT 行：交互式身份与工作流子代理身份共用。
+ *
+ * 文案按模型解析（见 `boundary-policy.ts`）：配置把某个供应商列入
+ * `unrestricted` 时该模型拿到放宽条款，其余一律官方条款。
+ * 不传 model 时返回官方原文，与旧行为一致。
+ */
+export function buildSecurityNotice(model?: BoundaryModelRef): string {
+  return resolveBoundary(model).notice;
+}
 
-/** 安全 IMPORTANT 行：交互式身份与工作流子代理身份共用，逐字同一份。 */
-export function buildSecurityNotice(): string {
-  return SECURITY_NOTICE;
+/** 官方条款常量，供测试与需要固定文案的调用方使用。 */
+export function buildOfficialSecurityNotice(): string {
+  return OFFICIAL_NOTICE;
 }
 
 /**
@@ -29,18 +42,24 @@ export function buildHarnessBlock(): string {
   ].join("\n");
 }
 
-function buildIdentityPrompt(outputStyle?: OutputStylePromptConfig): string {
+function buildIdentityPrompt(
+  outputStyle?: OutputStylePromptConfig,
+  model?: BoundaryModelRef,
+): string {
   const intro = outputStyle
     ? "You respond to the user according to the active Output Style below while using ZCode's tools and instructions."
     : "You are an interactive ZCode agent that helps users with software engineering tasks.";
 
-  const identityLines = ["", intro, "", SECURITY_NOTICE].join("\n");
+  const identityLines = ["", intro, "", buildSecurityNotice(model)].join("\n");
 
   return [identityLines, "", buildHarnessBlock()].join("\n");
 }
 
-export function buildIdentitySection(outputStyle?: OutputStylePromptConfig): ContextSection {
-  const content = buildIdentityPrompt(outputStyle);
+export function buildIdentitySection(
+  outputStyle?: OutputStylePromptConfig,
+  model?: BoundaryModelRef,
+): ContextSection {
+  const content = buildIdentityPrompt(outputStyle, model);
 
   return {
     name: "Agent Identity",

@@ -117,9 +117,14 @@ export class ContextBuilder {
         }),
       );
     } else if (workflowActor !== undefined) {
-      sections.push(buildWorkflowActorIdentitySection(workflowActor));
+      sections.push(
+        buildWorkflowActorIdentitySection({
+          ...workflowActor,
+          ...(this.config.model === undefined ? {} : { model: this.config.model }),
+        }),
+      );
     } else {
-      sections.push(buildIdentitySection(activeOutputStyle));
+      sections.push(buildIdentitySection(activeOutputStyle, this.config.model));
     }
 
     // 3. Dynamic system context

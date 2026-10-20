@@ -135,6 +135,11 @@ export interface ContextBuilderConfig {
 export interface WorkflowActorContext {
   name?: string;
   persona?: string;
+  /**
+   * 当前模型标识。工作流子代理与主代理共用同一份安全边界解析，
+   * 缺了它会让子代理始终拿到官方条款，与主代理行为不一致。
+   */
+  model?: { readonly providerId?: string; readonly modelId?: string };
 }
 
 export type ContextUserInstructionsRequest = UserInstructionsOptions;
