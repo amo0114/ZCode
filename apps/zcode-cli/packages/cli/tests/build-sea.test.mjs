@@ -737,6 +737,7 @@ test("includes bundled official plugin assets", async () => {
     assert.equal(browserUsePaths.has("docs/computer-use.md"), false);
     assert.equal(documentPaths.has(".zcode-plugin/plugin.json"), true);
     assert.equal(documentPaths.has("skills/docx/SKILL.md"), true);
+    assert.equal(documentPaths.has("skills/docx-viewer/SKILL.md"), true);
     assert.equal(documentPaths.has("skills/pdf/SKILL.md"), true);
     assert.equal(documentPaths.has("skills/pdf/scripts/pdf.py"), true);
     assert.equal(documentPaths.has("skills/pptx/SKILL.md"), true);
@@ -1301,6 +1302,11 @@ async function writeDocumentPluginFixtures(root) {
     await writeTestFile(root, `packages/${name}-plugin/.zcode-plugin/plugin.json`, "{}");
     await writeTestFile(root, `packages/${name}-plugin/agents/visual-judge.md`, "");
     await writeTestFile(root, `packages/${name}-plugin/skills/${skill}/SKILL.md`, "");
+    // 0.2.0 起文档插件带查看面板：viewer skill 与 office-runtime 构建产物都是必需资产。
+    await writeTestFile(root, `packages/${name}-plugin/skills/${skill}-viewer/SKILL.md`, "");
+    for (const runtimePath of ["dist/server.mjs", "dist/ui/assets.json", "dist/ui/panel.html"]) {
+      await writeTestFile(root, `packages/${name}-plugin/${runtimePath}`, "");
+    }
   }
   await writeTestFile(root, "packages/image-search-plugin/.zcode-plugin/plugin.json", "{}");
   await writeTestFile(root, "packages/image-search-plugin/.mcp.json", "{}");

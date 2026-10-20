@@ -2631,10 +2631,12 @@ describe("ZCode plugins", () => {
         skillCount: 1,
         skillRootCount: 1,
       });
+      // 0.2.0 起 documents 同时提供 docx 与 docx-viewer 两个 skill，并带查看面板的 MCP server。
       expect(documentPlugin).toMatchObject({
         enabled: true,
+        mcpServerNames: ["plugin:documents:documents"],
         name: "documents",
-        skillCount: 1,
+        skillCount: 2,
         skillRootCount: 1,
       });
       // 回归原因：启动发现链路与 overview 使用同一份 browser-use 内置内容，

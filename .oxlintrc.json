@@ -19,6 +19,21 @@
       "rules": {
         "max-lines": "off"
       }
+    },
+    {
+      // office-runtime 原样沿用上游实现（上游行数上限为 800）；查看器与 MCP server 职责完整，不为行数机械拆分。
+      "files": [
+        "**/apps/zcode-cli/packages/office-runtime/**",
+        // 包内以 --no-ignore 运行时，oxlint 按 cwd 相对路径匹配。
+        "scripts/e2e.mjs",
+        "src/adapters/server.ts",
+        "ui/main.tsx",
+        "ui/shell/parts.tsx",
+        "ui/viewers/*View.tsx"
+      ],
+      "rules": {
+        "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }]
+      }
     }
   ],
   "settings": {
