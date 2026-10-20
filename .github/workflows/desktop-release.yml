@@ -1,0 +1,56 @@
+name: Desktop Release
+
+# 推送 desktop-v* tag 时在 GitHub 托管的 Windows 机器上打 NSIS 安装包，并上传到同名 GitHub Release。
+# 不设置 ZCODE_AUTO_UPDATE：安装包既不连官方更新渠道，也不执行官方强制升级检查
+# （见 docs/desktop/build-time-optional-capabilities.md）。
+on:
+  push:
+    tags: ["desktop-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      # 仓库测试树路径较深，Windows 默认 260 字符上限会让 checkout 失败。
+      - name: Enable long paths
+        run: git config --system core.longpaths true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # 不向这一步提供 GH_TOKEN：electron-builder 检测到 token 时可能自行发布到 GitHub。
+      - name: Bundle Windows installer
+        run: pnpm bundle:desktop -- --os win --arch x64
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: packages/desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(packages/desktop/dist/*.exe)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no installer produced" >&2
+            exit 1
+          fi
+          # 重跑同一个 tag 时复用已有 Release 并覆盖安装包。
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
