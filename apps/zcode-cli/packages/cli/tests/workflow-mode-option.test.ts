@@ -167,6 +167,7 @@ test("every app the TUI creates, including /new, carries the same pair", async (
     undefined,
     undefined,
     false,
+    "off",
     undefined,
     undefined,
     "alwaysOn",

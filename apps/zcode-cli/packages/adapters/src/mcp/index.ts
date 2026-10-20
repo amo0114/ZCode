@@ -1331,7 +1331,7 @@ class NodeMcpAdapter implements McpPort {
       );
       listToolsDurationMs = Date.now() - listToolsStartedAt;
       const tools = listed.tools.map((tool) =>
-        normalizeMcpToolDescriptor(name, tool, config.timeoutMs),
+        normalizeMcpToolDescriptor(name, tool, config.timeoutMs, config.alwaysLoad),
       );
       const negotiatedProtocolEra = client.getProtocolEra();
       const negotiatedProtocolVersion = client.getNegotiatedProtocolVersion();

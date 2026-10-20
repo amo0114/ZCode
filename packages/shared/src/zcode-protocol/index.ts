@@ -78,6 +78,7 @@ import {
 } from "../browser-use/backend.js";
 import { browserClientModeSchema, browserCommandSchema } from "../browser-use/commands.js";
 import { browserCommandResultSchema } from "../browser-use/result.js";
+import { appToolSearchModeSchema } from "../app-runtime-preferences.js";
 import { integratedTerminalShellSelectionSchema } from "../validationAppSettings.js";
 import {
   zcodeSyntheticUserMessageSourceSchema as legacyZcodeSyntheticUserMessageSourceSchema,
@@ -743,6 +744,7 @@ export const zcodeProtocolMcpServerSchema = z.union([
       env: z.array(zcodeProtocolMcpEntrySchema),
       isolation: z.enum(["session", "workspace"]).optional(),
       protocolVersion: z.enum(["legacy", "auto", "2026-07-28"]).optional(),
+      alwaysLoad: z.boolean().optional(),
       timeoutMs: z.number().int().positive().optional(),
     })
     .strict(),
@@ -755,6 +757,7 @@ export const zcodeProtocolMcpServerSchema = z.union([
       oauth: zcodeProtocolMcpOAuthSchema.optional(),
       isolation: z.enum(["session", "workspace"]).optional(),
       protocolVersion: z.enum(["legacy", "auto", "2026-07-28"]).optional(),
+      alwaysLoad: z.boolean().optional(),
       timeoutMs: z.number().int().positive().optional(),
     })
     .strict(),
@@ -2015,6 +2018,7 @@ export type ZCodeModelContextBudgetStrategy = z.infer<typeof zcodeModelContextBu
 export const zcodeSessionRuntimePreferencesResultSchema = z
   .object({
     nativeSearchEnhancementsEnabled: z.boolean(),
+    toolSearchMode: appToolSearchModeSchema.default("off"),
     subagentRuntimeConfigEnabled: z.boolean().optional(),
     memoryEnabled: z.boolean().default(false),
     askUserQuestionAutoResolutionEnabled: z.boolean().default(true),

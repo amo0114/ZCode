@@ -14,6 +14,7 @@ import type { McpTelemetryTracker } from "@zcode/adapters";
 import type { WorkspaceHookPolicyProvider } from "@zcode/core";
 import {
   zcodeProtocolErrorCodes,
+  type AppToolSearchMode,
   type ZCodeAutomationBotDeliveryTarget,
   type ZCodeDeliveryKind,
   type ModelSelection,
@@ -83,6 +84,7 @@ export interface ZCodeProtocolSessionRecord {
   subagentRuntimeConfigEnabled?: boolean;
   memoryEnabled: boolean;
   nativeSearchEnhancementsEnabled: boolean;
+  toolSearchMode: AppToolSearchMode;
   modelContextBudgetStrategy: ZCodeModelContextBudgetStrategy;
   createdAt: number;
   deliveryKind?: ZCodeDeliveryKind;

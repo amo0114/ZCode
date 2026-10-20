@@ -2253,6 +2253,14 @@ const zhCN: Record<string, string> = {
   "settings.memory.viewer.title": "已保存的工作区记忆",
   "settings.memory.viewer.description": "查看此设备上按工作区保存的记忆。",
   "settings.memory.viewer.projectsDescription": "选择一个项目，查看该项目保存的全部记忆。",
+  "settings.toolSearch": "工具搜索",
+  "settings.toolSearchDescription":
+    "自动：按模型选择原生或本地搜索；本地：通过本地搜索按需加载工具；关闭：发送完整工具目录。新建会话或应用重启后恢复会话时生效，当前会话保持原设置。",
+  "settings.toolSearchExperimentalNotice":
+    "实验性功能。若模型供应商未完整支持原生 ToolSearch，使用原生模式可能导致缓存失效并增加 Token 用量。",
+  "settings.toolSearch.auto": "自动",
+  "settings.toolSearch.local": "本地",
+  "settings.toolSearch.off": "关闭",
   "settings.memory.viewer.refresh": "刷新",
   "settings.memory.viewer.loading": "正在加载记忆…",
   "settings.memory.viewer.empty": "暂无已保存的工作区记忆",
@@ -5039,6 +5047,8 @@ const zhCN: Record<string, string> = {
   "chat.toolCall.sessionContext.read": "已读取上下文",
   "chat.toolCall.sessionContext.title": "读取会话上下文",
   "chat.toolCall.sessionContext.query": "查询",
+  "chat.toolCall.search.tools": "搜索工具",
+  "chat.toolCall.search.toolsWithQuery": "搜索工具：{query}",
   "chat.toolCall.sessionContext.result": "结果",
   "chat.toolCall.sessionContext.noResult": "没有返回上下文。",
   "chat.toolCall.explore.label": "查阅",

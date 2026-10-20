@@ -2393,6 +2393,14 @@ const enUS: Record<string, string> = {
     "Memory details are available only in the local desktop app. Open Memory settings there to view them.",
   "settings.memory.viewer.title": "Saved workspace memories",
   "settings.memory.viewer.description": "Browse memories saved by workspace on this device.",
+  "settings.toolSearch": "Tool search",
+  "settings.toolSearchDescription":
+    "Auto selects native or local search for the model. Local loads tools on demand. Off sends the full tool catalog. Applies to new sessions and sessions restored after an app restart; active sessions keep their settings.",
+  "settings.toolSearchExperimentalNotice":
+    "Experimental feature. Using native mode with a model provider that does not fully support native ToolSearch may invalidate prompt caching and increase token usage.",
+  "settings.toolSearch.auto": "Auto",
+  "settings.toolSearch.local": "Local",
+  "settings.toolSearch.off": "Off",
   "settings.memory.viewer.projectsDescription":
     "Select a project to view all of its saved memories.",
   "settings.memory.viewer.refresh": "Refresh",
@@ -5256,6 +5264,8 @@ const enUS: Record<string, string> = {
   "chat.toolCall.sessionContext.read": "Read context",
   "chat.toolCall.sessionContext.title": "Read session context",
   "chat.toolCall.sessionContext.query": "Query",
+  "chat.toolCall.search.tools": "Search tools",
+  "chat.toolCall.search.toolsWithQuery": "Search tools: {query}",
   "chat.toolCall.sessionContext.result": "Result",
   "chat.toolCall.sessionContext.noResult": "No context returned.",
   "chat.toolCall.explore.label": "Explore",

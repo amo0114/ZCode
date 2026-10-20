@@ -1,3 +1,4 @@
+import type { ToolSearchMode } from "@zcode/contracts";
 import { extname } from "node:path";
 import { formatJson, type PresentationSurface } from "@zcode/core";
 import type { RunContext, GlobalOptions } from "@zcode/shared-types";
@@ -75,6 +76,7 @@ export const runPrompt = async (
   resumeRequest: CliResumeRequest = { continueSession: false },
   toolDisallowlist?: readonly string[],
   forceMcs = false,
+  toolsearchMode: ToolSearchMode = "off",
   presentationSurface: PresentationSurface = "terminal",
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
 ): Promise<number> => {
@@ -228,6 +230,7 @@ export const runPrompt = async (
       runtimeConfig: {
         ...(mode ? { mode } : {}),
         ...(toolDisallowlist ? { toolDisallowlist } : {}),
+        toolSearch: { mode: toolsearchMode },
         ...(forceMcs ? { midConversationSystem: { mode: "force" as const } } : {}),
         ...resolveWorkflowModeRuntimeConfig(workflowMode),
         memory: { extractionEnabled: options.memoryBench === true },

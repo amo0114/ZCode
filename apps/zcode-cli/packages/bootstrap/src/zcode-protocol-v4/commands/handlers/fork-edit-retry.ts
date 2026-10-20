@@ -292,7 +292,8 @@ async function retryTurn(
   }
   const attachmentRefs = stableAttachmentRefs(resolution.editTarget);
   const attachments = await mapAttachmentRefsToTurnAttachments(record.app, attachmentRefs);
-  await submitConversationRewind(host, record, resolution.messageId);
+  // 从 assistant 就近回溯 user 会误选中途的合成提醒；使用已解析的原始输入边界。
+  await submitConversationRewind(host, record, resolution.editTarget.transcriptMessageId);
   await startCanonicalIntent(
     host,
     record,

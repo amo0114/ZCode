@@ -221,6 +221,8 @@ function resolveMcpServerConfig(
         typeof server.cwd === "string"
           ? resolveTemplate(server.cwd, context, { allowSensitive: false })
           : undefined,
+      // 修复原因：各 transport 分别重建配置曾漏传 alwaysLoad，导致插件常驻工具被延迟。
+      alwaysLoad: typeof server.alwaysLoad === "boolean" ? server.alwaysLoad : undefined,
       enabled: typeof server.enabled === "boolean" ? server.enabled : undefined,
       env,
       source,
@@ -237,6 +239,7 @@ function resolveMcpServerConfig(
   return {
     type,
     url: resolveTemplate(url, context, { allowSensitive: false }),
+    alwaysLoad: typeof server.alwaysLoad === "boolean" ? server.alwaysLoad : undefined,
     enabled: typeof server.enabled === "boolean" ? server.enabled : undefined,
     headers,
     oauth,

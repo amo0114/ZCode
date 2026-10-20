@@ -369,6 +369,9 @@ export const TID_RESOURCE_MANAGER_STORAGE_TOTAL = "resource-manager-storage-tota
 /** 资源管理器「存储」tab：扫描状态（data-state=scanning|complete|cancelled|failed|idle） */
 export const TID_RESOURCE_MANAGER_STORAGE_STATUS = "resource-manager-storage-status";
 /** 资源管理器「存储」tab：重新计算按钮 */
+/** 常规设置中的工具搜索模式选择 */
+export const TID_SETTINGS_TOOL_SEARCH_SELECT = "settings-tool-search-select";
+export const TID_SETTINGS_TOOL_SEARCH_OPTION = "settings-tool-search-option";
 export const TID_RESOURCE_MANAGER_STORAGE_RESCAN = "resource-manager-storage-rescan";
 /** 资源管理器「存储」tab：磁盘卡片（suffix=卷 key 序号） */
 export const TID_RESOURCE_MANAGER_STORAGE_DISK_CARD = "resource-manager-storage-disk-card";

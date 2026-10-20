@@ -546,6 +546,8 @@ describe("Explore subagent", () => {
     const stoppedPayload = stoppedEvent.payload as any;
     const toolResultPayload = toolResultEvent.payload as any;
     expect(spawnPayload.allowedTools).toEqual([
+      "ToolSearch",
+      "DeferredToolCall",
       "Bash",
       "Read",
       "WebFetch",
@@ -2790,126 +2792,6 @@ describe("Explore subagent", () => {
     expect(metadata).not.toHaveProperty("transcriptFile");
   });
 
-  it("launches background Explore by default when run_in_background is requested", async () => {
-    const sessionId = createSessionId("runtime-subagent-background-default");
-    const eventStore = createTestSessionEventStore();
-    const outputRootDir = await mkdtemp(join(tmpdir(), "zcode-subagent-output-"));
-    const parentRequests: any[] = [];
-    const childRequests: any[] = [];
-    const childGate = createDeferred<void>();
-
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "build",
-        workingDirectory: "/workspace/project",
-        subagents: {
-          outputRootDir,
-        },
-      },
-      {
-        eventStore,
-        modelFactory: createTestModelFactory({
-          async generateText(request: any) {
-            const toolNames = (request.tools ?? []).map((tool: any) => tool.name);
-            if (toolNames.includes("Agent")) {
-              parentRequests.push(request);
-              if (parentRequests.length === 1) {
-                return {
-                  finishReason: "tool-calls",
-                  providerMetadata: undefined,
-                  text: "",
-                  toolCalls: [
-                    {
-                      id: "call_legacy_background_explore",
-                      name: "Agent",
-                      input: {
-                        description: "Legacy background",
-                        prompt: "Return after the background child finishes.",
-                        run_in_background: true,
-                        subagent_type: "Explore",
-                      },
-                    },
-                  ],
-                  usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-                };
-              }
-
-              return {
-                finishReason: "stop",
-                providerMetadata: undefined,
-                text: "foreground subagent completed",
-                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-              };
-            }
-
-            childRequests.push(request);
-            await childGate.promise;
-            return {
-              finishReason: "stop",
-              providerMetadata: undefined,
-              text: "Background child finished after run_in_background detached.",
-              usage: { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
-            };
-          },
-        } as never),
-      },
-    );
-
-    let turnSettled = false;
-    const turnPromise = runtime.executeTurn("Use a legacy background explore").then((value) => {
-      turnSettled = true;
-      return value;
-    });
-
-    await waitFor(async () => childRequests.length === 1);
-    await waitFor(() => parentRequests.length === 2);
-    await waitFor(() => turnSettled);
-
-    const eventsBeforeChildCompletes = await eventStore.getEvents(sessionId);
-    expect(turnSettled).toBe(true);
-    expect(
-      eventsBeforeChildCompletes.some((event) => event.type === SessionEventType.TurnComplete),
-    ).toBe(true);
-    expect(
-      eventsBeforeChildCompletes.some(
-        (event) => event.type === SessionEventType.BackgroundTaskStarted,
-      ),
-    ).toBe(true);
-    expect(
-      eventsBeforeChildCompletes.some((event) => event.type === SessionEventType.SubagentStopped),
-    ).toBe(false);
-
-    childGate.resolve();
-    const result = await turnPromise;
-    await waitFor(async () => {
-      const events = await eventStore.getEvents(sessionId);
-      return events.some((event) => event.type === SessionEventType.BackgroundTaskCompleted);
-    });
-    await waitFor(() => parentRequests.length === 3);
-    const notificationRequestText = parentRequests[2].messages
-      .map((message: any) => modelMessageContentToText(message.content))
-      .join("\n");
-    const events = await eventStore.getEvents(sessionId);
-
-    expect(result.response).toBe("foreground subagent completed");
-    expect(parentRequests).toHaveLength(3);
-    expect(notificationRequestText).toContain("<task-notification>");
-    expect(notificationRequestText).toContain(
-      "<tool-use-id>call_legacy_background_explore</tool-use-id>",
-    );
-    expect(notificationRequestText).toContain(
-      "Background child finished after run_in_background detached.",
-    );
-    expect(events.some((event) => event.type === SessionEventType.SubagentStopped)).toBe(true);
-    expect(events.some((event) => event.type === SessionEventType.BackgroundTaskStarted)).toBe(
-      true,
-    );
-    expect(events.some((event) => event.type === SessionEventType.BackgroundTaskCompleted)).toBe(
-      true,
-    );
-  });
-
   it("runs foreground subagents in parallel when run_in_background is omitted", async () => {
     const sessionId = createSessionId("runtime-subagent-foreground-parallel");
     const eventStore = createTestSessionEventStore();
@@ -3280,83 +3162,6 @@ describe("Explore subagent", () => {
       "<message>已完成前半段检查，正在继续剩余权限分支。</message>",
     );
     expect(finalParentRequestText).toContain("child completed the remaining permission work");
-  });
-
-  it("runs built-in Explore on the main model by default while attributing usage to the subagent role", async () => {
-    const sessionId = createSessionId("runtime-explore-main-model");
-    const eventStore = createTestSessionEventStore();
-    const childRequests: any[] = [];
-    const childObservations: TestModelExecutionObservation[] = [];
-    let parentCallCount = 0;
-    const modelSelection = {
-      providerId: createModelProviderId("provider-main"),
-      modelId: createModelId("main-model"),
-    };
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "build",
-        modelSelection: createTestModelSelection(modelSelection),
-        workingDirectory: "/workspace/project",
-      },
-      {
-        eventStore,
-        modelFactory: createTestModelFactory({
-          async generateText(request: any, observation) {
-            const toolNames = (request.tools ?? []).map((tool: any) => tool.name);
-            if (toolNames.includes("Agent")) {
-              parentCallCount++;
-              if (parentCallCount === 1) {
-                return {
-                  finishReason: "tool-calls",
-                  providerMetadata: undefined,
-                  text: "",
-                  toolCalls: [
-                    {
-                      id: "call_explore_main",
-                      name: "Agent",
-                      input: {
-                        description: "Find runtime loop",
-                        prompt: "Find where the runtime injects tool results.",
-                        subagent_type: "Explore",
-                      },
-                    },
-                  ],
-                  usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-                };
-              }
-
-              return {
-                finishReason: "stop",
-                providerMetadata: undefined,
-                text: "done",
-                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-              };
-            }
-
-            childRequests.push(request);
-            childObservations.push(observation);
-            return {
-              finishReason: "stop",
-              providerMetadata: undefined,
-              text: "Explore used the inherited main model.",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-      },
-    );
-
-    await runtime.executeTurn("Use an explore agent");
-
-    expect(childRequests).toHaveLength(1);
-    // Explore 默认继承主 Loop 的 Model；usage 由 child runtime 的 taskType 归因，
-    // 不再依赖旧 ModelSelection.role 修改模型身份。
-    expect(childObservations[0].model).toMatchObject({
-      providerId: modelSelection.providerId,
-      modelId: modelSelection.modelId,
-    });
-    expect(childObservations[0].factoryInput.providerOptions).toBeUndefined();
   });
 
   it("ignores a legacy call model and runs the built-in general-purpose agent on its configured model", async () => {
@@ -4138,6 +3943,156 @@ describe("Explore subagent", () => {
       providerId: updatedModelSelection.providerId,
       modelId: updatedModelSelection.modelId,
     });
+  });
+
+  it("can launch Explore in the background and inject completion on a later turn", async () => {
+    const sessionId = createSessionId("runtime-explore-background");
+    const eventStore = createTestSessionEventStore();
+    const childRequests: any[] = [];
+    const parentRequests: any[] = [];
+    let parentCallCount = 0;
+    const childGate = createDeferred<void>();
+
+    const runtime = createTestAgentRuntime(
+      sessionId,
+      {
+        mode: "build",
+        workingDirectory: "/workspace/project",
+      },
+      {
+        eventStore,
+        modelFactory: createTestModelFactory({
+          async generateText(request: any) {
+            const toolNames = (request.tools ?? []).map((tool: any) => tool.name);
+            if (toolNames.includes("Agent")) {
+              parentCallCount++;
+              parentRequests.push(request);
+              if (parentCallCount === 1) {
+                return {
+                  finishReason: "tool-calls",
+                  providerMetadata: undefined,
+                  text: "",
+                  toolCalls: [
+                    {
+                      id: "call_background_explore",
+                      name: "Agent",
+                      input: {
+                        description: "Find queue",
+                        prompt: "Find where background notifications should be queued.",
+                        run_in_background: true,
+                        subagent_type: "Explore",
+                      },
+                    },
+                  ],
+                  usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+                };
+              }
+
+              return {
+                finishReason: "stop",
+                providerMetadata: undefined,
+                text:
+                  parentCallCount === 2 ? "background launched" : "parent saw background result",
+                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+              };
+            }
+
+            childRequests.push(request);
+            await childGate.promise;
+            return {
+              finishReason: "stop",
+              providerMetadata: undefined,
+              text: "Background child completed with async result.",
+              usage: { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
+            };
+          },
+        } as never),
+      },
+    );
+
+    let firstTurnSettled = false;
+    const firstTurnPromise = runtime.executeTurn("Start background explore").then((value) => {
+      firstTurnSettled = true;
+      return value;
+    });
+    await waitFor(async () => parentRequests.length === 2 && childRequests.length === 1);
+    await waitFor(async () => firstTurnSettled);
+
+    const eventsBeforeChildCompletes = await eventStore.getEvents(sessionId);
+    expect(
+      eventsBeforeChildCompletes.some((event) => event.type === SessionEventType.TurnComplete),
+    ).toBe(true);
+
+    childGate.resolve();
+
+    await waitFor(async () => {
+      const events = await eventStore.getEvents(sessionId);
+      return events.some((event) => event.type === SessionEventType.SubagentStopped);
+    });
+    await waitFor(async () => {
+      const events = await eventStore.getEvents(sessionId);
+      return events.some((event) => event.type === SessionEventType.BackgroundTaskCompleted);
+    });
+    const firstTurn = await firstTurnPromise;
+
+    const parentEvents = await eventStore.getEvents(sessionId);
+    const spawnEvent = parentEvents.find(
+      (event) => event.type === SessionEventType.SubagentSpawned,
+    );
+    const backgroundStartedEvent = parentEvents.find(
+      (event) => event.type === SessionEventType.BackgroundTaskStarted,
+    );
+    const backgroundCompletedEvent = parentEvents.find(
+      (event) => event.type === SessionEventType.BackgroundTaskCompleted,
+    );
+    const toolResultEvent = parentEvents.find(
+      (event) => event.type === SessionEventType.ToolCallResult,
+    );
+
+    if (!spawnEvent || !backgroundStartedEvent || !backgroundCompletedEvent || !toolResultEvent) {
+      throw new Error("Expected background subagent lifecycle events");
+    }
+    const spawnPayload = spawnEvent.payload as any;
+    const backgroundStartedPayload = backgroundStartedEvent.payload as any;
+    const backgroundCompletedPayload = backgroundCompletedEvent.payload as any;
+    const toolResultPayload = toolResultEvent.payload as any;
+
+    expect(spawnPayload.background).toBe(true);
+    expect(backgroundStartedPayload.toolName).toBe("Agent");
+    expect(backgroundStartedPayload.taskKind).toBe("subagent");
+    expect(backgroundStartedPayload.childSessionId).toBe(spawnPayload.childSessionId);
+    expect(backgroundStartedPayload.cancellable).toBe(true);
+    expect(backgroundCompletedPayload.taskKind).toBe("subagent");
+    expect(backgroundCompletedPayload.childSessionId).toBe(spawnPayload.childSessionId);
+    expect(backgroundCompletedPayload.status).toBe("completed");
+    expect(toolResultPayload.result.content).toContain("Async agent launched successfully.");
+    expect(toolResultPayload.result.content).toContain("internal ID - do not mention to user");
+    expect(toolResultPayload.result.content).toContain("Use SendMessage with to:");
+    expect(toolResultPayload.result.content).toContain("output_file:");
+
+    await waitForCondition(() => parentRequests.length === 3);
+    const finalRequest = parentRequests.at(-1);
+    const finalRequestMessages = finalRequest.messages
+      .map((message: any) => message.content)
+      .join("\n");
+
+    expect(firstTurn.response).toBe("background launched");
+    expect(parentRequests).toHaveLength(3);
+    expect(finalRequestMessages).toContain("<task-notification>");
+    expect(finalRequestMessages).toContain("Background child completed with async result");
+    const notificationMessage = finalRequest.messages.find((message: any) =>
+      modelMessageContentToText(message.content).includes("<task-notification>"),
+    );
+    expect(notificationMessage?.role).toBe("user");
+    const notificationText = modelMessageContentToText(notificationMessage?.content ?? "");
+    expect(notificationText).toMatch(
+      /^<system-reminder>\n\[SYSTEM NOTIFICATION - NOT USER INPUT\]\n/,
+    );
+    expect(notificationText).toMatch(/\n<\/system-reminder>$/);
+    expect(notificationText.match(/<\/?system-reminder>/g)).toEqual([
+      "<system-reminder>",
+      "</system-reminder>",
+    ]);
   });
 
   it("does not register Agent when subagents are disabled", () => {

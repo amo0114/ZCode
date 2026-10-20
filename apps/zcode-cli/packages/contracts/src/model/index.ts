@@ -1,3 +1,4 @@
+import type { ModelToolReferenceContentBlock } from "../tools/tool-search.js";
 // ============================================================
 // Model Protocol - provider-neutral model contracts
 // ============================================================
@@ -398,6 +399,7 @@ export interface ModelResourceLinkContentBlock {
 }
 
 export type ModelMessageContentBlock =
+  | ModelToolReferenceContentBlock
   | ModelTextContentBlock
   | ModelReasoningContentBlock
   | ModelImageContentBlock
@@ -437,6 +439,8 @@ export function modelMessageContentBlockToText(block: ModelMessageContentBlock):
       return block.text;
     case "reasoning":
       return "";
+    case "tool_reference":
+      return block.toolName;
     case "image":
       return attachmentPlaceholder("Attached", block.mediaType, block.source?.placeholder);
     case "video":
@@ -474,6 +478,7 @@ export type ModelToolSideEffectScope =
   | "userInteraction";
 
 export interface ModelToolContract {
+  deferLoading?: boolean;
   name: string;
   description?: string;
   capability?: string;
@@ -648,6 +653,7 @@ export interface ModelRequestSettings {
 }
 
 export interface ModelTextRequest extends ModelRequestSettings {
+  toolSearchEnabled?: boolean;
   messages: ModelInputMessage[];
   tools?: ModelToolContract[];
   toolChoice?: ModelToolChoice;
@@ -858,6 +864,15 @@ const attachmentRefJsonSchema = {
 
 const modelMessageContentBlockJsonSchema = {
   oneOf: [
+    {
+      type: "object",
+      required: ["type", "toolName"],
+      additionalProperties: false,
+      properties: {
+        type: { enum: ["tool_reference"] },
+        toolName: { type: "string", minLength: 1 },
+      },
+    },
     {
       type: "object",
       required: ["type", "text"],

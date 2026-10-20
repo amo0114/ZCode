@@ -15,6 +15,7 @@ export interface McpServerRuntimeSource {
 }
 
 export interface McpServerConfigBase {
+  alwaysLoad?: boolean;
   enabled?: boolean;
   isolation?: McpServerIsolation;
   protocolVersion?: McpProtocolVersion;
@@ -114,6 +115,8 @@ export const ZCODE_MCP_BROWSER_SCREENSHOT_CONTENT_INDICES_META_KEY =
 export const ZCODE_MCP_NODE_REPL_CUA_APP_META_KEY = "zcode/nodeReplCuaApp";
 
 export interface McpToolDescriptor {
+  alwaysLoad?: boolean;
+  searchHint?: string;
   serverName: string;
   toolName: string;
   name?: string;

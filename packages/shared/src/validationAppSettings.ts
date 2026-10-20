@@ -1,5 +1,6 @@
 /* oxlint-disable eslint(max-lines) -- AppSettings schema 聚合历史迁移、默认值和 patch 校验，拆分会削弱设置迁移的单一入口。 */
 import { z } from "zod";
+import { appToolSearchModeSchema } from "./app-runtime-preferences.js";
 import type { AppSettings } from "./protocol.js";
 import { REMOTE_ASSET_INSTALL_MODES } from "./remoteAssetInstallMode.js";
 import { isKnownRemoteResourcePackageId } from "./remoteResourcePackages.js";
@@ -501,6 +502,7 @@ const appSettingsObjectSchema = z.object({
     ...ZCODE_ENABLED_AGENT_PROVIDERS,
   ]),
   nativeSearchEnhancementsEnabled: z.boolean().default(true),
+  toolSearchMode: appToolSearchModeSchema.default("off"),
   onboardingOccupation: appSettingsOccupationSchema.nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
   memoryEnabled: z.boolean().default(false),
@@ -572,6 +574,7 @@ export const appSettingsPatchSchema = z.object({
   dynamicWorkflowMode: z.union([z.enum(DYNAMIC_WORKFLOW_MODES), z.literal("")]).optional(),
   enabledBuiltinAgentCliProviders: enabledBuiltinAgentCliProvidersSchema.optional(),
   nativeSearchEnhancementsEnabled: z.boolean().optional(),
+  toolSearchMode: appToolSearchModeSchema.optional(),
   onboardingOccupation: z
     .enum([
       "office",

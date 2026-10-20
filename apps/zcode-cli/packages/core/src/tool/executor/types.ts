@@ -1,3 +1,4 @@
+import type { ToolSearchExecutionContext } from "@zcode/contracts";
 import type {
   AgentExecutionTelemetryPort,
   AgentTelemetryActorKind,
@@ -173,6 +174,7 @@ export interface ToolExecutor {
 }
 
 export interface ToolExecuteOptions {
+  toolSearch?: ToolSearchExecutionContext;
   automationTurn?: boolean;
   signal?: AbortSignal;
   traceContext?: TraceContext;

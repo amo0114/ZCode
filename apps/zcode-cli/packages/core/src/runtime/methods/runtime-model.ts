@@ -82,6 +82,7 @@ export function withModelInvocationContext(
     modelId: model.modelId,
     displayName: model.displayName,
     properties: model.properties,
+    requestCapabilities: model.requestCapabilities,
     optionSpecs: model.optionSpecs,
     options: model.options,
     bind(options) {

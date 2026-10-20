@@ -161,8 +161,11 @@ describe("AgentRuntime background Memory extraction", () => {
       runtime
         .getTools()
         .map((tool) => tool.name)
-        .filter((name) => name !== "WebSearch"),
+        .filter(
+          (name) => name !== "WebSearch" && name !== "ToolSearch" && name !== "DeferredToolCall",
+        ),
     );
+    expect(request.toolSearchEnabled).toBe(false);
 
     extractionResponse.resolve(textResult(request, "Nothing to save."));
     await runtime.drainMemoryExtractions();
@@ -170,6 +173,52 @@ describe("AgentRuntime background Memory extraction", () => {
       modelRequestSessionType: "main",
       metadata: { querySource: "project_memory_extract", skipTranscript: true },
     });
+  });
+
+  it("prepares inherited ToolSearch history against the frozen Memory tool scope", async () => {
+    const requests: ModelRequest[] = [];
+    let mainRequests = 0;
+    const generateText = async (request: ModelRequest): Promise<ModelResult> => {
+      requests.push(request);
+      if (isExtractionRequest(request)) return textResult(request, "Nothing to save.");
+      if (++mainRequests === 1)
+        return {
+          text: "",
+          finishReason: "tool-calls",
+          usage: {},
+          toolCalls: [
+            { id: "search-memory", name: "ToolSearch", input: { query: "select:WebFetch" } },
+          ],
+        };
+      return textResult(request, "main answer");
+    };
+    const baseFactory = createTestModelFactory({ generateText });
+    const withSearch = (model: Model): Model => ({
+      ...model,
+      requestCapabilities: { toolSearch: { protocolSupported: true, defaultEnabled: true } },
+      bind: (options) => withSearch(model.bind(options)),
+    });
+    const runtime = createExtractionRuntime({
+      generateText,
+      modelFactory: (input) => withSearch(baseFactory(input)),
+      toolSearch: { mode: "native" },
+    });
+    await runtime.executeTurn("remember that I use WebFetch");
+    await runtime.drainMemoryExtractions();
+    const extraction = requests.find(isExtractionRequest)!;
+    expect(extraction.toolSearchEnabled).toBe(false);
+    expect(extraction.tools?.some((tool) => tool.name === "ToolSearch")).toBe(false);
+    expect(
+      extraction.tools?.find((tool) => tool.name === "WebFetch")?.deferLoading,
+    ).toBeUndefined();
+    expect(providerMessagesToText(extraction.messages)).toContain(
+      "Tool references removed - tool search not enabled",
+    );
+    expect(JSON.stringify(extraction.messages)).not.toContain('"tool_reference"');
+    expect(providerMessagesToText(extraction.messages)).not.toContain("schemas are NOT loaded");
+    expect(
+      JSON.stringify(requests.filter((request) => !isExtractionRequest(request)).at(-1)?.messages),
+    ).toContain('"tool_reference"');
   });
 
   it("bounds a lazy pending snapshot to the successful Main turn that scheduled it", async () => {
@@ -671,6 +720,7 @@ describe("AgentRuntime background Memory extraction", () => {
 });
 
 function createExtractionRuntime(input: {
+  toolSearch?: { mode: "native" | "local" | "off" | "auto" };
   artifactStore?: ToolArtifactStorePort;
   generateText: (
     request: ModelRequest,
@@ -689,6 +739,7 @@ function createExtractionRuntime(input: {
   return createTestAgentRuntime(
     createSessionId(`runtime-memory-extraction-${crypto.randomUUID()}`),
     {
+      toolSearch: input.toolSearch,
       memory: {
         cliStorageRoot: CLI_STORAGE_ROOT,
         enabled: true,

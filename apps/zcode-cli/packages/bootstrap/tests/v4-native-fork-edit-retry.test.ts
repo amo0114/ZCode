@@ -725,7 +725,7 @@ describe("v4 原生 retryTurn", () => {
     await settle();
 
     expect(app.runtime.rewindConversationToMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ targetMessageId: "msg-assistant" }),
+      expect.objectContaining({ targetMessageId: "msg-user" }),
     );
     expect(app.sendInput).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -881,7 +881,7 @@ describe("v4 原生 retryTurn", () => {
     // canonical intent 已由 projection resolver 在截断前给出，不再回读 raw transcript 文本。
     expect(resolveOrder).toEqual(["rewind"]);
     expect(app.runtime.rewindConversationToMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ targetMessageId: "msg-b" }),
+      expect.objectContaining({ targetMessageId: "user-msg-b" }),
     );
     expect(app.sendInput).toHaveBeenCalledWith(
       { text: "原始问题" },
@@ -928,7 +928,7 @@ describe("v4 原生 retryTurn", () => {
       ),
     ).resolves.toBeUndefined();
     expect(record.app.runtime.rewindConversationToMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ targetMessageId: "msg-b" }),
+      expect.objectContaining({ targetMessageId: "user-msg-b" }),
     );
     expect(record.app.sendInput).toHaveBeenCalled();
   });

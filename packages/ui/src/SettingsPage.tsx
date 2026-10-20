@@ -71,6 +71,7 @@ import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { cn } from "@/components/lib/utils.js";
 import { useSelectDirectory } from "@/hooks/usePlatform.js";
 import { ServiceProvider, useServices } from "@/hooks/useServices.js";
+import type { AppToolSearchMode } from "@zcode/shared";
 import { useSettings } from "@/hooks/useSettingService.js";
 import type { CreateTaskRequest } from "@/app-shell/types.js";
 import { useBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
@@ -344,6 +345,7 @@ export function SettingsPage({
     return [...names];
   }, [sharedSettings?.recentProjects, workspaceTabs]);
   const memoryEnabled = sharedSettings?.memoryEnabled === true;
+  const toolSearchMode = sharedSettings?.toolSearchMode ?? "off";
   const nativeSearchEnhancementsEnabled = sharedSettings?.nativeSearchEnhancementsEnabled !== false;
   const askUserQuestionAutoResolutionEnabled =
     sharedSettings?.askUserQuestionAutoResolutionEnabled !== false;
@@ -510,6 +512,18 @@ export function SettingsPage({
       setIntegratedTerminalShell(selection);
     },
     [services.settingService],
+  );
+  const handleToolSearchModeChange = useCallback(
+    async (mode: AppToolSearchMode) => {
+      await runSettingsActionAsync({
+        featureId: "settings.search",
+        action: "change_tool_search_mode",
+        trigger: "select",
+        operation: () => updateSharedSettings({ toolSearchMode: mode }),
+        completed: { resultSource: "shared_settings", valueAfter: mode },
+      });
+    },
+    [updateSharedSettings],
   );
   const handleNativeSearchEnhancementsEnabledChange = useCallback(
     async (enabled: boolean) => {
@@ -1300,6 +1314,8 @@ export function SettingsPage({
                             terminalFontFamily={terminalFontFamily}
                             integratedTerminalShell={integratedTerminalShell}
                             integratedTerminalShellOptions={integratedTerminalShellOptions}
+                            toolSearchMode={toolSearchMode}
+                            onToolSearchModeChange={handleToolSearchModeChange}
                             nativeSearchEnhancementsEnabled={nativeSearchEnhancementsEnabled}
                             httpProxy={httpProxy}
                             httpProxyNoProxy={httpProxyNoProxy}

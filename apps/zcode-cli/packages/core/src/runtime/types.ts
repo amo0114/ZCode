@@ -1,3 +1,4 @@
+import type { ToolSearchExecutionContext, ToolSearchMode } from "@zcode/contracts";
 import type { GetAgentDefinitions, LoadAgentDefinitions } from "../subagent/definitions.js";
 import type { RuntimeInputPresentation, TurnExecutionModelFallbackReason } from "@zcode/contracts";
 /* eslint-disable max-lines -- Runtime 类型集中承载 core/runtime 对外结构，拆分需要单独迁移。 */
@@ -114,6 +115,7 @@ import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-
 // -----------------------------------------------
 
 export interface AgentRuntimeConfig {
+  toolSearch?: { mode?: ToolSearchMode };
   /** shared-host CUA request routing metadata; desktop is the safe default. */
   clientMode?: "desktop-continuous" | "web-remote-replayable";
   deliveryKind?: "desktop-continuous" | "web-remote-replayable";
@@ -728,6 +730,7 @@ export interface PermissionDecisionResult {
 }
 
 export interface ExecuteToolsOptions {
+  toolSearch?: ToolSearchExecutionContext;
   automationTurn?: boolean;
   signal?: AbortSignal;
   traceContext?: TraceContext;
@@ -814,6 +817,7 @@ export interface ProviderContextUsageSnapshot {
 }
 
 export interface RunModelTextRequestOptions {
+  toolSearchEnabled?: boolean;
   abortSignal?: AbortSignal;
   assistantMessageId: MessageId;
   events: SessionEvent[];

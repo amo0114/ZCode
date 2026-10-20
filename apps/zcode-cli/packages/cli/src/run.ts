@@ -1,3 +1,4 @@
+import { ToolSearchModeSchema } from "@zcode/contracts";
 import { extractDisallowedToolsArgs, parseGlobalArgs } from "./arguments.js";
 import { createNodeLoggerFactory } from "@zcode/adapters";
 import { getRuntimeInfo, type PresentationSurface } from "@zcode/core";
@@ -405,6 +406,14 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     browserExecutable,
     outputFormat,
   );
+  const parsedToolsearchMode = ToolSearchModeSchema.safeParse(
+    parsed.values["toolsearch-mode"] ?? "off",
+  );
+  if (!parsedToolsearchMode.success) {
+    ctx.stderr.write("--toolsearch-mode must be one of auto, native, local, off.\n");
+    return 1;
+  }
+  const toolsearchMode = parsedToolsearchMode.data;
   const forceMcs = parsed.values["force-mcs"] === true;
   let targetRequest: CliTargetRequest | undefined;
   try {
@@ -478,14 +487,16 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
   const workflowMode = workflowModeOption ?? DEFAULT_CLI_WORKFLOW_MODE;
 
   if (
-    forceMcs &&
+    (forceMcs || parsed.values["toolsearch-mode"] !== undefined) &&
     !isForceMcsSupportedInvocation({
       positionals: parsed.positionals,
       prompt: parsed.values.prompt as string | undefined,
       targetRequest,
     })
   ) {
-    ctx.stderr.write(`${FORCE_MCS_SCOPE_ERROR}\n`);
+    ctx.stderr.write(
+      `${parsed.values["toolsearch-mode"] !== undefined ? "--toolsearch-mode can only be used with --prompt, --target, or tui." : FORCE_MCS_SCOPE_ERROR}\n`,
+    );
     return 1;
   }
 
@@ -527,6 +538,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       resumeRequest,
       toolDisallowlist,
       forceMcs,
+      toolsearchMode,
       presentationSurface,
       workflowMode,
     );
@@ -544,6 +556,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       resumeRequest,
       toolDisallowlist,
       forceMcs,
+      toolsearchMode,
       presentationSurface,
       workflowMode,
     );
@@ -590,6 +603,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
         resumeRequest,
         toolDisallowlist,
         forceMcs,
+        toolsearchMode,
         workflowMode,
       );
     default:
