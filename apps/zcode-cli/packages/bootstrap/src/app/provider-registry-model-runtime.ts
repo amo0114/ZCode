@@ -74,6 +74,8 @@ export class ApiProviderModelRuntime {
     return this.#modelAdapter.createModel({
       providerId: provider.providerId,
       modelId: registryModel.modelId,
+      // 个人 Provider 的 ID 是内部生成值（new-provider 等），面向模型的自我描述应使用用户看到的名称。
+      displayName: `${provider.providerName?.trim() || provider.providerId}/${registryModel.modelId}`,
       providerConfig: provider.config,
       modelConfig: config,
       options: {

@@ -65,6 +65,7 @@ export function buildGitSystemContextSection(envInfo: EnvInfo): ContextSection |
 
 function buildEnvInfoContent(info: EnvInfo, model?: Model): string {
   const hasGitRepository = isEnvInfoGitRepository(info);
+  const modelName = model && (model.displayName ?? `${model.providerId}/${model.modelId}`);
   const lines: string[] = [
     ENVIRONMENT_HEADING,
     "You have been invoked in the following environment:",
@@ -74,9 +75,7 @@ function buildEnvInfoContent(info: EnvInfo, model?: Model): string {
     `- ${SHELL_LABEL}: ${info.shell}`,
     `- ${OS_VERSION_LABEL}: ${info.osVersion}`,
     // 旧环境快照可能携带历史模型字段；渲染只读取本步骤实际执行的 Model。
-    ...(model
-      ? [`- You are powered by the model named ${model.providerId}/${model.modelId}.`]
-      : []),
+    ...(modelName ? [`- You are powered by the model named ${modelName}.`] : []),
   ];
 
   return lines.join("\n");

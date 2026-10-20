@@ -107,11 +107,21 @@ describe("ApiProviderModelRuntime", () => {
     expect(created[0]).toMatchObject({
       providerId: "api-provider",
       modelId: "model-a",
+      displayName: "api-provider/model-a",
       options: { reasoningLevel: "high" },
     });
     expect(created[0]?.options).not.toHaveProperty("maxOutputTokens");
     expect(created[0]?.providerConfig).toBe(registry.getProvider("api-provider")?.config);
     expect(created[0]?.modelConfig).toBe(registry.getModel("api-provider", "model-a")?.config);
+  });
+
+  it("Model displayName 使用用户可见的 Provider 名称而非内部 ID", () => {
+    const registry = new ProviderRegistry([
+      { ...provider("new-provider"), providerName: "MoYuan" },
+    ]);
+    const { created, runtime } = captureRuntime(registry);
+    runtime.modelFactory({ selection: selection("new-provider") });
+    expect(created[0]?.displayName).toBe("MoYuan/model-a");
   });
 
   it("Registry 更新只影响之后创建的 Model", () => {
