@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLoginApiKeyDefaultModelPreferenceFromSelection,
+  isValidCustomProviderBaseUrl,
+  resolveCustomProviderName,
   resolveHydratedLoginApiKeyValue,
   shouldShowLoginApiKeyLink,
 } from "@/login/LoginApiKeyForm.helpers.js";
@@ -52,5 +54,14 @@ describe("LoginApiKeyForm provider update helpers", () => {
         userEdited: true,
       }),
     ).toBeNull();
+  });
+
+  it("自定义供应商只接受 http(s) Base URL，并以 hostname 作为 Provider 名称", () => {
+    expect(isValidCustomProviderBaseUrl(" https://api.example.com/v1 ")).toBe(true);
+    expect(isValidCustomProviderBaseUrl("http://localhost:8080")).toBe(true);
+    expect(isValidCustomProviderBaseUrl("api.example.com/v1")).toBe(false);
+    expect(isValidCustomProviderBaseUrl("ftp://api.example.com")).toBe(false);
+    expect(resolveCustomProviderName("https://api.example.com/v1")).toBe("api.example.com");
+    expect(resolveCustomProviderName("not a url")).toBeUndefined();
   });
 });

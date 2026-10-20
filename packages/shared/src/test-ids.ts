@@ -13,8 +13,12 @@ export const TID_LOGIN_MENU_ITEM = "login-menu-item";
 export const TID_LOGIN_USE_API_KEY_BUTTON = "login-use-api-key-button";
 /** API Key 登录 provider 选择触发器 */
 export const TID_LOGIN_API_KEY_PROVIDER_TRIGGER = "login-api-key-provider-trigger";
-/** API Key 登录 provider 选择项（动态后缀为 provider choice） */
+/** API Key 登录 provider 选择项（动态后缀为 Template id，自定义供应商为 custom） */
 export const TID_LOGIN_API_KEY_PROVIDER_ITEM = "login-api-key-provider-item";
+/** API Key 登录自定义供应商 Base URL 输入框 */
+export const TID_LOGIN_API_KEY_BASE_URL_INPUT = "login-api-key-base-url-input";
+/** API Key 登录自定义供应商模型 ID 输入框 */
+export const TID_LOGIN_API_KEY_MODEL_INPUT = "login-api-key-model-input";
 /** API Key 登录密钥输入框 */
 export const TID_LOGIN_API_KEY_INPUT = "login-api-key-input";
 /** API Key 登录继续按钮 */
