@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* oxlint-disable eslint(max-lines) -- 官方插件打包清单需与 bootstrap / SEA / 远端资产逐项对齐，集中在一处便于审查；文档插件查看面板加入后超出上限。 */
 
 // 桌面打包态的 agent 运行时资产：把 agent 的 JS bundle（zcode.cjs）放进 bundled-agents/<platform>/glm，
 // 由 app 内置的 Electron Node runtime（ELECTRON_RUN_AS_NODE）执行，替代以前随包内置的独立 Node 二进制。

@@ -1,3 +1,4 @@
+/* oxlint-disable eslint(max-lines) -- 欢迎页 API Key 表单同时承载预设供应商与自定义渠道（地址、模型列表、能力预览、原生工具搜索检测）；后续再按渠道类型拆分。 */
 import { useEffect, useState } from "react";
 import {
   isApiKeyAccess,
