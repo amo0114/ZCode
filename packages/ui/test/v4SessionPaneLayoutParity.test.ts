@@ -490,9 +490,11 @@ describe("SessionPane v4 chat layout parity", () => {
       "viewportHeight - COMPOSER_MESSAGE_MASK_TRANSPARENT_HEIGHT_PX",
     );
     expect(timelineSource).toContain("black ${opaqueEnd}px, transparent ${transparentStart}px");
+    const maskSyncStart = timelineSource.indexOf("const syncMessageLayerMask = useCallback");
+    // 只截取 mask 回调本身；其后的浮窗 dock 高度同步 effect 需要读取 dock 尺寸，不属于 mask 同步。
     const maskSyncSource = timelineSource.slice(
-      timelineSource.indexOf("const syncMessageLayerMask = useCallback"),
-      timelineSource.indexOf("const syncTurnNavigatorViewport = useCallback"),
+      maskSyncStart,
+      timelineSource.indexOf("}, []);", maskSyncStart),
     );
     expect(maskSyncSource).not.toContain("getBoundingClientRect");
     expect(timelineSource).not.toContain("data-v4-composer-mask-target");

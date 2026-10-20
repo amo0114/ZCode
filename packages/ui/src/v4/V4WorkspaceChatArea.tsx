@@ -34,7 +34,13 @@ import {
   type PaneSplitSide,
   type PaneWorkspaceScope,
 } from "@/v4/paneLayoutStore.js";
-import { collectWorkbenchLayout, dividerStyle, SPLIT_VAR_PREFIX } from "@/v4/workbenchLayout.js";
+import {
+  collectWorkbenchLayout,
+  dividerStyle,
+  FULL_WORKBENCH_RECT,
+  SPLIT_VAR_PREFIX,
+} from "@/v4/workbenchLayout.js";
+import { useConversationPanePresentation } from "@/side-pane-full-view/index.js";
 import { WorkbenchLeafPane, type WorkbenchShellBinding } from "@/v4/WorkbenchPane.js";
 import { WorkbenchSplitDivider } from "@/v4/WorkbenchSplitDivider.js";
 import type { ConversationDropTargetController } from "@/v4/composer/conversationDropTarget.js";
@@ -251,7 +257,10 @@ export function V4WorkspaceChatArea({
   }, [layout]);
 
   const paneCount = layout.leaves.length;
-  const showFocusIndicator = paneCount > 1;
+  const { presentation } = useConversationPanePresentation();
+  // 完整视图浮窗只容纳一个对话：旧的拆分布局只显示焦点 pane，其余隐藏但保持挂载。
+  const soloPaneId = presentation === "floating" && paneCount > 1 ? focusedPaneId : null;
+  const showFocusIndicator = paneCount > 1 && !soloPaneId;
   const canSplit = paneCount < MAX_WORKBENCH_PANES;
 
   const shellScope = useMemo<PaneWorkspaceScope>(
@@ -562,7 +571,8 @@ export function V4WorkspaceChatArea({
         <WorkbenchLeafPane
           key={leaf.paneId}
           paneId={leaf.paneId}
-          rect={leaf.rect}
+          rect={soloPaneId ? FULL_WORKBENCH_RECT : leaf.rect}
+          hidden={soloPaneId !== null && leaf.paneId !== soloPaneId}
           // Settings 只把 workspace 设为 inert，Pane 之前仍保留 focused=true，
           // 会在隐藏状态提前消费 Plugin 试用的一次性预填。可见性并入 focus 后，
           // 请求只会由返回 workspace 后真正可交互的 Composer 消费。
@@ -585,7 +595,7 @@ export function V4WorkspaceChatArea({
           onDropSession={compactForRemoteControl ? undefined : handleDropSession}
         />
       ))}
-      {layout.dividers.map((divider) => (
+      {(soloPaneId ? [] : layout.dividers).map((divider) => (
         <WorkbenchSplitDivider
           key={divider.splitId}
           containerRef={containerRef}

@@ -55,7 +55,15 @@ import { AutomationsMainBreadcrumbFrame } from "@/settings/AutomationsMainBreadc
 import { PluginStorePage } from "@/settings/PluginStorePage.js";
 import { TaskFindDialog } from "@/quickpick/TaskFindDialog.js";
 import { WebRemoteControlMobileShell } from "@/WebRemoteControlMobileShell.js";
-import { WorkspaceHeader } from "@/WorkspaceHeader.js";
+import { resolveTopOverlayLeadingPaddingClass, WorkspaceHeader } from "@/WorkspaceHeader.js";
+import {
+  readFloatingAnchorPreference,
+  SidePaneFullViewConversationHost,
+  writeFloatingAnchorPreference,
+  type FloatingAnchor,
+  type SidePaneFullViewFloating,
+  type SidePaneFullViewHostMode,
+} from "@/side-pane-full-view/index.js";
 import {
   WorkspaceSidebar,
   type SidebarFileTreeOpenRequest,
@@ -350,6 +358,8 @@ export const WorkspaceShellLayout = memo(
     goBackShortcutLabel,
     goForwardShortcutLabel,
     toggleSidePaneShortcutLabel,
+    toggleSidePaneFullViewShortcutLabel,
+    sidePaneFullView,
     canGoBack,
     canGoForward,
     canTaskNavBack,
@@ -569,13 +579,45 @@ export const WorkspaceShellLayout = memo(
         (entry) => Boolean(entry.workspaceKey) && !retained.has(entry.workspaceKey),
       );
     }, [openWorkspaceKeys]);
+    // 完整视图（docs/ui/side-pane-full-view.md）只读派生：不改侧栏、面板宽度等原有状态，退出后自然恢复。
+    const fullViewController = isWebRemoteControlShell ? undefined : sidePaneFullView;
+    const activeFullView =
+      workspaceMainView === "chat" ? (fullViewController?.fullView ?? null) : null;
+    const isFullView = activeFullView !== null;
+    const fullViewMode: SidePaneFullViewHostMode = !activeFullView
+      ? "normal"
+      : activeFullView.surface === "conversation"
+        ? "conversation"
+        : "floating";
+    const isFloatingFullView = fullViewMode === "floating";
+    const isFullViewRef = useRef(isFullView);
+    isFullViewRef.current = isFullView;
+    const [fullViewSlotElement, setFullViewSlotElement] = useState<HTMLDivElement | null>(null);
+    const [floatingAnchor, setFloatingAnchor] = useState<FloatingAnchor>(
+      readFloatingAnchorPreference,
+    );
+    const handleFloatingAnchorChange = useCallback((anchor: FloatingAnchor) => {
+      setFloatingAnchor(anchor);
+      writeFloatingAnchorPreference(anchor);
+    }, []);
+    const handleFullViewFloatingChange = useCallback(
+      (floating: SidePaneFullViewFloating) => fullViewController?.setFloating(floating),
+      [fullViewController],
+    );
+    const handleOpenFullViewConversation = useCallback(
+      () => fullViewController?.setSurface("conversation"),
+      [fullViewController],
+    );
+    const fullViewConversationTitle =
+      activeTaskTitle?.trim() || intl.formatMessage({ id: "taskList.untitled" });
     const isSidebarPanelVisible = isSidebarVisible;
     const {
       panelRef: terminalPanelRef,
       panelElementRef: terminalPanelElementRef,
       isVisible: isTerminalVisible,
     } = useAnimatedResizablePanel({
-      open: isTerminalOpen,
+      // 浮窗只承载对话本身；终端只在普通视图和完整视图的对话 tab 中显示，开合状态不变。
+      open: isTerminalOpen && !isFloatingFullView,
       expandedSize: "30%",
       rememberExpandedSize: true,
     });
@@ -676,6 +718,10 @@ export const WorkspaceShellLayout = memo(
           isSidePaneOpen: latestIsSidePaneOpen,
           workspaceKey: latestWorkspaceKey,
         } = conversationAutoCollapseStateRef.current;
+        // 完整视图中对话由宿主 fixed 定位，对话列宽度不代表可见对话区，不能据此收起面板或侧栏。
+        if (isFullViewRef.current) {
+          return;
+        }
 
         // 功能说明：自动收起只响应用户改变窗口尺寸后的 conversation 实际宽度。
         // 不监听 conversation 自身 ResizeObserver，避免用户手动打开面板时又被策略关回去。
@@ -1942,6 +1988,11 @@ export const WorkspaceShellLayout = memo(
         });
       }
     }, [activeTaskId, workspaceKey]);
+    const hasUpdateStatusButton =
+      updateReadyVersion !== null ||
+      updateState?.kind === "update-available" ||
+      updateState?.kind === "download-progress" ||
+      updateState?.kind === "update-downloaded";
     const renderSidePanePanel = (options: { mobileOverlay?: boolean } = {}) => (
       <AnimatedSidePanePanel
         services={services}
@@ -1959,6 +2010,31 @@ export const WorkspaceShellLayout = memo(
         isVisible={options.mobileOverlay ? isSidePaneOpen : isSidePaneVisible}
         onCloseSidePane={handleToggleSidePane}
         toggleSidePaneShortcutLabel={toggleSidePaneShortcutLabel}
+        fullViewToggle={
+          !options.mobileOverlay && fullViewController
+            ? {
+                active: isFullView,
+                onToggle: fullViewController.toggle,
+                shortcutLabel: toggleSidePaneFullViewShortcutLabel,
+              }
+            : undefined
+        }
+        fullView={
+          !options.mobileOverlay && activeFullView && fullViewController
+            ? {
+                surface: activeFullView.surface,
+                conversationTitle: fullViewConversationTitle,
+                leadingInsetClassName: resolveTopOverlayLeadingPaddingClass({
+                  isSidebarVisible,
+                  isMacDesktop,
+                  isMacFullscreen,
+                  hasUpdateReady: hasUpdateStatusButton,
+                }),
+                onSelectSurface: fullViewController.setSurface,
+              }
+            : null
+        }
+        fullViewSlotRef={options.mobileOverlay ? undefined : setFullViewSlotElement}
         sidePaneState={sidePaneState}
         recentClosedSidePaneTabs={recentClosedSidePaneTabs}
         isBrowserOpen={isBrowserOpen}
@@ -2029,11 +2105,6 @@ export const WorkspaceShellLayout = memo(
       />
     );
     const sidePanePanel = renderSidePanePanel();
-    const hasUpdateStatusButton =
-      updateReadyVersion !== null ||
-      updateState?.kind === "update-available" ||
-      updateState?.kind === "download-progress" ||
-      updateState?.kind === "update-downloaded";
     // 修复原因：Draft 之前维护一套独立轻量 header，导致 side pane、caption 安全区和拖拽入口
     // 与 Task Header 分叉。桌面端统一复用 WorkspaceHeader，只由 variant 裁剪 task 专属内容；
     // 手机远控无 active task 时仍不渲染桌面 chrome，继续遵守 replayable overlay 边界。
@@ -2521,6 +2592,9 @@ export const WorkspaceShellLayout = memo(
                 className={cn(
                   "min-h-0 flex-1",
                   isWebRemoteControlShell && "max-md:!flex-col",
+                  // 完整视图：面板外框以 Group 为定位容器铺满整行，对话内容由宿主 fixed 定位。
+                  // 不改 react-resizable-panels 管理的 flex：压成 0 会让 resize 得到 NaN。
+                  isFullView && "relative",
                 )}
               >
                 <ResizablePanel
@@ -2533,6 +2607,15 @@ export const WorkspaceShellLayout = memo(
                       : undefined
                   }
                 >
+                  <SidePaneFullViewConversationHost
+                    mode={fullViewMode}
+                    floating={activeFullView?.floating ?? "collapsed"}
+                    anchor={floatingAnchor}
+                    slotElement={fullViewSlotElement}
+                    onFloatingChange={handleFullViewFloatingChange}
+                    onAnchorChange={handleFloatingAnchorChange}
+                    onOpenConversation={handleOpenFullViewConversation}
+                  >
                   <ResizablePanelGroup
                     orientation="vertical"
                     layoutId="workspace-conversation-column-layout"
@@ -2562,9 +2645,11 @@ export const WorkspaceShellLayout = memo(
                       isTerminalVisible && "rounded-b-[var(--workspace-panel-radius)] border-b",
                       isWebRemoteControlShell &&
                         "max-md:rounded-none max-md:border-x-0 max-md:border-b-0",
+                      // 完整视图由面板外框或浮窗外框承担边框与圆角，对话 frame 不再叠一层。
+                      isFullView && "rounded-none border-0",
                     )}
                   >
-                    {shouldRenderWorkspaceHeader ? (
+                    {shouldRenderWorkspaceHeader && !isFullView ? (
                       <ScopedErrorBoundary
                         scope="workspace-header"
                         resetKeys={workspaceOnlyResetKeys}
@@ -2882,6 +2967,7 @@ export const WorkspaceShellLayout = memo(
                           />
                     ) : null}
                   </ResizablePanelGroup>
+                  </SidePaneFullViewConversationHost>
                 </ResizablePanel>
                 {/* Bugfix：Browser Guest Host 必须与主视图路由解耦，避免 automations/plugin
                     切换时卸载 Guest；截图请求期间由上层临时展开真实面板承载可合成的 WebContents。 */}
