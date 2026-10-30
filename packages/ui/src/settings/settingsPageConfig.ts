@@ -18,6 +18,7 @@ import {
   WandSparkles,
   Keyboard,
   FileSearch,
+  User,
 } from "lucide-react";
 import { isSettingsSectionEnabled, type SettingsSectionId } from "@/lib/settingsNavigation.js";
 import type { Theme } from "@/useTheme.js";
@@ -72,6 +73,14 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     icon: Package,
     titleId: "settings.modelProviderTitle",
     groupId: "basics",
+  },
+  // 个性化（用户自定义指令）是 Agent 能力组的第一项：编辑 ~/.zcode/AGENTS.md，
+  // 对所有会话生效（spec：docs/ui/settings-personalization.md）。
+  {
+    id: "personalization",
+    icon: User,
+    titleId: "settings.personalization.title",
+    groupId: "agentCapabilities",
   },
   {
     id: "memory",

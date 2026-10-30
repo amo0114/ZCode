@@ -989,6 +989,9 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
     update: async () => {},
     updateDataBaseDir: async () => {},
     ensureDefaultProject: async (path: string) => ({ path, created: false }),
+    // 个性化指令编辑的是桌面 Host 的 ~/.zcode/AGENTS.md；未连接 bridge 前没有本机 Host，明确报错。
+    getUserInstructions: unsupported("settingService.getUserInstructions"),
+    saveUserInstructions: unsupported("settingService.saveUserInstructions"),
   };
 
   const emptyGitSummary = (workspacePath: string) => ({

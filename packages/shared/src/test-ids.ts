@@ -759,3 +759,11 @@ export const TID_PLUGIN_UI_WEBVIEW = "plugin-ui-webview";
 
 /** 用户反馈的诊断日志授权开关 */
 export const TID_FEEDBACK_LOGS_OPT_IN = "feedback-logs-opt-in";
+/** 个性化（用户自定义指令）编辑器 */
+export const TID_SETTINGS_PERSONALIZATION_EDITOR = "settings-personalization-editor";
+/** 个性化保存按钮 */
+export const TID_SETTINGS_PERSONALIZATION_SAVE = "settings-personalization-save";
+/** 个性化取消按钮 */
+export const TID_SETTINGS_PERSONALIZATION_CANCEL = "settings-personalization-cancel";
+/** 个性化内容超限提示 */
+export const TID_SETTINGS_PERSONALIZATION_SIZE_HINT = "settings-personalization-size-hint";

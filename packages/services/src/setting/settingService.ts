@@ -1,7 +1,12 @@
 import { access, readFile, mkdir, rename } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import type { AppSettings } from "@zcode/shared";
+import {
+  USER_INSTRUCTIONS_MAX_BYTES,
+  USER_INSTRUCTIONS_TOO_LARGE_ERROR_CODE,
+  type AppSettings,
+} from "@zcode/shared";
+import { atomicWritePrivateTextFile } from "@zcode/shared/node";
 import {
   appSettingsPatchSchema,
   appSettingsSchema,
@@ -10,10 +15,15 @@ import {
 } from "@zcode/shared";
 import type { ISettingService } from "./setting.js";
 import { normalizeSettingsPatch } from "#src/setting/normalizeSettingsPatch.js";
-import { copyDataDirectory, getDataBaseDir, validateDataBaseDirTarget } from "../paths.js";
+import {
+  copyDataDirectory,
+  getAgentUserInstructionsFilePath,
+  getDataBaseDir,
+  validateDataBaseDirTarget,
+} from "../paths.js";
 import { isEffectiveDevelopmentNodeEnv } from "../runtime-tools/nodeEnv.js";
 import { maybeThrowInjectedFsFault } from "../fs/fsFaultInjection.js";
-import { atomicWriteText } from "../fs/atomicFileUtils.js";
+import { atomicWriteText, withAtomicFileLock } from "../fs/atomicFileUtils.js";
 import { withSettingsWriteQueueTimeout } from "./settingsWriteQueue.js";
 const MAX_RECENT_PROJECTS = 10;
 const DEFAULT_PROJECT_NAME = "ZCodeProject";
@@ -206,6 +216,17 @@ async function writeSettings(
 }
 
 export function createSettingService(): ISettingService {
+  // 实例创建时取值，读取与写入始终同源。
+  const userInstructionsFile = getAgentUserInstructionsFilePath();
+  // atomicWriteText 只保证单次替换完整，不保证多次保存的提交顺序；慢 IO 下旧写的 rename
+  // 可能晚于新写落地。个性化指令写入进程内 FIFO 排队，跨实例写入再由文件锁兜一层；
+  // 读取先排空队列，避免保存后立即重开读到旧内容。
+  let userInstructionsWriteQueue: Promise<unknown> = Promise.resolve();
+  const enqueueUserInstructionsWrite = <T>(write: () => Promise<T>): Promise<T> => {
+    const queued = userInstructionsWriteQueue.then(write, write);
+    userInstructionsWriteQueue = queued.catch(() => {});
+    return queued;
+  };
   let updateQueue = Promise.resolve();
   let commitQueue = Promise.resolve();
   let writeQueueGeneration = 0;
@@ -307,6 +328,47 @@ export function createSettingService(): ISettingService {
       await this.update({ dataBaseDir: newDir });
     },
 
+    async getUserInstructions(): Promise<{ content: string; filePath: string }> {
+      // 读取等待已接纳的写入排空：保存后立即重开分区时不能把旧内容当基线。
+      await userInstructionsWriteQueue;
+      try {
+        const content = await readFile(userInstructionsFile, "utf8");
+        return { content, filePath: userInstructionsFile };
+      } catch (error) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          (error as { code?: string }).code === "ENOENT"
+        ) {
+          // 文件不存在等价于未配置个性化指令，不算错误。
+          return { content: "", filePath: userInstructionsFile };
+        }
+        throw error;
+      }
+    },
+    async saveUserInstructions(content: string): Promise<{ filePath: string }> {
+      // 最终校验用与 CLI 读取一致的共享常量，防止其他 RPC 调用方绕过 UI 写入超限内容
+      // （Agent 只读前 100KB，超限保存会让用户误以为全部生效）。
+      if (Buffer.byteLength(content, "utf8") > USER_INSTRUCTIONS_MAX_BYTES) {
+        const error = new Error(`user instructions exceed ${USER_INSTRUCTIONS_MAX_BYTES} bytes`);
+        (error as Error & { code: string }).code = USER_INSTRUCTIONS_TOO_LARGE_ERROR_CODE;
+        throw error;
+      }
+      await enqueueUserInstructionsWrite(async () => {
+        // acquireFileLock 以不带 recursive 的 mkdir(lockFile) 创建锁文件，父目录不存在时会 ENOENT，
+        // 所以建目录必须发生在取锁之前，否则首次保存永远失败。
+        maybeThrowInjectedFsFault({ operation: "mkdir", path: dirname(userInstructionsFile) });
+        await mkdir(dirname(userInstructionsFile), { recursive: true });
+        await withAtomicFileLock(userInstructionsFile, async () => {
+          maybeThrowInjectedFsFault({ operation: "writeFile", path: userInstructionsFile });
+          // atomicWriteText 的临时文件不带 mode，rename 后会把既有 0600 文件放宽为 umask 默认；
+          // 私有写入固定 0600。
+          await atomicWritePrivateTextFile(userInstructionsFile, content);
+        });
+      });
+      return { filePath: userInstructionsFile };
+    },
     async ensureDefaultProject(userHomeDir: string): Promise<{ path: string; created: boolean }> {
       const path = join(userHomeDir, DEFAULT_PROJECT_NAME);
       let existedBefore = true;

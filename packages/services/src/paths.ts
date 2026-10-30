@@ -57,6 +57,17 @@ export function getAppConfigDir(): string {
   return join(getZCodeDataRootDir(), "v2");
 }
 
+/** 与 CLI adapter 读取 `~/.zcode/AGENTS.md` 的 home 解析保持一致（HOME → USERPROFILE → os.homedir）。 */
+export function resolveAgentUserInstructionsHomeDir(env: NodeJS.ProcessEnv = process.env): string {
+  const envHome = env.HOME?.trim() || env.USERPROFILE?.trim();
+  return envHome && envHome.length > 0 ? envHome : homedir();
+}
+
+/** `{home}/.zcode/AGENTS.md`：用户自定义指令（个性化）的唯一事实源文件。 */
+export function getAgentUserInstructionsFilePath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(resolveAgentUserInstructionsHomeDir(env), ".zcode", "AGENTS.md");
+}
+
 function readEnvValue(env: Record<string, string | undefined>, key: string): string | undefined {
   const direct = env[key]?.trim();
   if (direct) {
