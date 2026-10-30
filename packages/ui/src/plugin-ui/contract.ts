@@ -198,6 +198,8 @@ export function buildPluginUiSidePaneTabId(request: OpenPluginUiSideTabRequest):
 }
 
 export interface PluginUiSidePaneViewProps {
+  /** 由宿主页面、侧栏展开状态与当前标签派生，不以保活 DOM 的几何相交替代。 */
+  visible: boolean;
   scopeRef: PluginUiScopeRef;
   host: {
     pageKey: string;
@@ -220,6 +222,10 @@ export interface PluginUiToolCallViewProps {
   surface?: string;
   preferredDisplayMode: McpAppsDisplayMode;
   sidePaneActive: boolean;
+  inlineAllowed: boolean;
+  pluginId: string;
+  pluginName: string;
+  pluginIcon?: string;
   host: PluginUiSidePaneViewProps["host"];
   prefersBorder: boolean;
   /** 被同一逻辑 UI 的较新成功结果替代；只留普通工具结果，不建沙箱或自动开侧栏。 */
@@ -234,6 +240,7 @@ export interface PluginUiToolCallViewProps {
   retryLabel: string;
   openedLabel: string;
   openLabel: string;
+  openButtonLabel: string;
   onWidthChange(width: number): void;
   onOpenSidePane?: () => void;
 }

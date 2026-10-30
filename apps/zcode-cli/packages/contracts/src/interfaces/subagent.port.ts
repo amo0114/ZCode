@@ -39,17 +39,18 @@ export type SubagentLaunchOptions = SubagentRunOptions;
 
 export type SubagentStartRequest = SubagentRunRequest;
 
-export interface SubagentStartOptions {
-  signal?: AbortSignal;
-  /** 后台 child 启动时继承的普通 Model；临时 turn 模型仍禁止进入后台。 */
-  model?: Model;
-}
+export type SubagentStartOptions = SubagentRunOptions;
 
 export interface SubagentWaitOptions {
   signal?: AbortSignal;
 }
 
 export interface SubagentStopOptions {
+  /**
+   * 谁在停：TaskStop 传 "model"，App 停止传 "user"，系统路径（rewind、闲时任务收尾）不传。
+   * 后台 agent 的 killed 通知据此写 "was stopped by ZCode" / "by user" / "was stopped"。
+   */
+  initiator?: "user" | "model";
   signal?: AbortSignal;
 }
 
@@ -58,16 +59,15 @@ export interface SubagentSendMessageRequest {
   turnId?: TurnId;
   parentToolCallId: ToolCallId | string;
   to: string;
-  summary: string;
+  /** 可选：只用于 UI 预览，缺省时用 message 的第一行；交付给 child 的只有 message。 */
+  summary?: string;
   message: string;
   workingDirectory: string;
   workspaceRoot: string;
   trace: TraceContext;
 }
 
-export interface SubagentSendMessageOptions {
-  signal?: AbortSignal;
-}
+export type SubagentSendMessageOptions = SubagentRunOptions;
 
 export type SubagentSendMessageDelivery = "queued" | "steered" | "resumed_background";
 
@@ -109,6 +109,8 @@ export interface SubagentTaskSnapshot {
 }
 
 export interface SubagentPort {
+  /** 关闭准入，取消所属执行并等待真实执行和资源清理；不删除历史。 */
+  close?(): Promise<void>;
   launch(request: SubagentLaunchRequest, options?: SubagentLaunchOptions): Promise<AgentOutput>;
   run(request: SubagentRunRequest, options?: SubagentRunOptions): Promise<AgentOutput>;
   start?(

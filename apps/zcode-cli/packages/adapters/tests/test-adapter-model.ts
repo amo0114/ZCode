@@ -11,6 +11,7 @@ import type { TestAiSdkModelAdapter } from "./test-provider-config.js";
 import { createTestModelProperties } from "./test-model-format.js";
 
 type TestModelTextRequest = ModelTextRequest & {
+  modelRequestSessionFeatures?: ModelInvocationContext["modelRequestSessionFeatures"];
   properties?: ModelProperties;
 };
 
@@ -61,7 +62,7 @@ function modelRequest(request: ModelTextRequest): ModelRequest {
   };
 }
 
-function invocationContext(request: ModelTextRequest): ModelInvocationContext {
+function invocationContext(request: TestModelTextRequest): ModelInvocationContext {
   return {
     metadata: request.metadata,
     modelCall: request.modelCall,
@@ -69,6 +70,7 @@ function invocationContext(request: ModelTextRequest): ModelInvocationContext {
     modelRequestAdmission: request.modelRequestAdmission,
     modelRetryBudget: request.modelRetryBudget,
     modelRequestSessionType: request.modelRequestSessionType,
+    modelRequestSessionFeatures: request.modelRequestSessionFeatures,
     preserveProviderStreamBoundaries: request.preserveProviderStreamBoundaries,
     statusSink: request.statusSink,
     streamIdleTimeoutRetryNumber: request.streamIdleTimeoutRetryNumber,

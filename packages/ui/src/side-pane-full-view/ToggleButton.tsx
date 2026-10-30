@@ -1,5 +1,5 @@
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
-import { TID_SIDE_PANE_FULL_VIEW_TOGGLE } from "@zcode/shared";
+import { TID_SIDE_PANE_FULL_VIEW_TOGGLE } from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";

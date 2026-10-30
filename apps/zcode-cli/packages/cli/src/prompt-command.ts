@@ -1,4 +1,5 @@
 import type { ToolSearchMode } from "@zcode/contracts";
+import { createCliProviderRefreshReporter } from "./provider-runtime-env.js";
 import { extname } from "node:path";
 import { formatJson, type PresentationSurface } from "@zcode/core";
 import type { RunContext, GlobalOptions } from "@zcode/shared-types";
@@ -217,6 +218,7 @@ export const runPrompt = async (
     );
     browserRuntime = createCliHeadlessBrowserRuntime(options, deps);
     app = await createApp({
+      modelSelectionMode: "cli-default",
       browserControlPort: browserRuntime?.browserControlPort,
       env: appEnv,
       // headless 没有交互审批面，core 因此退到 deny broker，于是 CreateWorkflow 的
@@ -644,4 +646,3 @@ function writeHeadlessWorkspaceHookTrustDiagnostic(
     ].join("\n") + "\n",
   );
 }
-import { createCliProviderRefreshReporter } from "./provider-runtime-env.js";

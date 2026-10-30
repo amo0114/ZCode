@@ -177,7 +177,7 @@ export function V4InteractionDialogs({
       onCommandSettled,
     });
     // 软门禁：不再强制跳转 Settings/Hooks。
-    // 用户通过 WorkspaceHookPendingBanner 的 [去审核] 按钮主动打开 Hooks 设置。
+    // 用户通过 WorkspaceHookPendingIndicator 的 [去审核] 按钮主动打开 Hooks 设置。
   }, [
     clearWorkspaceHookReview,
     onCommandSettled,
@@ -334,13 +334,13 @@ export function V4InteractionDialogs({
       <PermissionDialog
         key={pending.interactionId}
         request={request}
+        permissionMode={currentSnapshot?.config?.mode}
         workspacePath={workspacePath}
         {...(workspaceIdentity === undefined ? {} : { workspaceIdentity })}
         {...(remoteSessionId === undefined ? {} : { remoteSessionId })}
         {...(workflowSessionModel === undefined ? {} : { workflowSessionModel })}
         isWebRemoteControl={isWebRemoteControl}
         provider={provider}
-        permissionMode={currentSnapshot?.config?.mode}
         responding={
           permissionResponse?.interactionId === pending.interactionId && permissionResponse.pending
         }

@@ -13,7 +13,7 @@ import {
   isConversationSharePath,
   resolveConversationShareCodeFromPath,
 } from "../../web/src/share/conversationShareRoute.js";
-import { resolveWebRemoteControlInitialTheme } from "../../web/src/webRemoteControlThemeSeed.js";
+import { resolveWebRemoteControlInitialTheme } from "../../web/src/web-remote-control/adapters/webRemoteControlThemeSeed.js";
 
 const root = createRoot(document.getElementById("root")!);
 

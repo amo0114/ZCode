@@ -9,6 +9,7 @@ import { PluginUiSidePaneView } from "@/plugin-ui/components/PluginUiSidePane.js
 
 type Props = {
   tab: PluginUiSidePaneTab;
+  visible: boolean;
   onOpenBrowserUrl?: (url: string) => void;
   /** 页面请求回到 inline 时宿主关闭本 tab。 */
   onCloseTab?: (tabId: string) => void;

@@ -8,6 +8,7 @@ import {
   ProviderConfigMap,
   ProviderConfigResolver,
   ProviderRegistry,
+  ZhipuAccountAccessConfig,
   type ProviderId,
 } from "@zcode/provider";
 import {
@@ -40,11 +41,16 @@ describe("真实 ZCode Built-in Config 到 Active Model", () => {
       personalProviders: new ProviderConfigMap([
         [
           providerId,
-          new ProviderConfig({
-            templateId: "zai-api",
-            group: "standard-personal",
-            access: new ApiKeyAccessConfig({ apiKey: "test-zai-api-key" }),
-          }),
+          // 实例在创建时复制模板；Resolver 不会从已退场的 templateId 字段隐式继承。
+          zcodeBuiltin.providerTemplates
+            .get("zai-api")!
+            .config.withPersonalModelIds([modelId])
+            .overlay(
+              new ProviderConfig({
+                group: "standard-personal",
+                access: new ApiKeyAccessConfig({ apiKey: "test-zai-api-key" }),
+              }),
+            ),
         ],
       ]),
     });
@@ -71,6 +77,7 @@ describe("真实 ZCode Built-in Config 到 Active Model", () => {
       },
     });
   });
+
 });
 
 function selectionWithHighestReasoning(
@@ -88,6 +95,7 @@ function selectionWithHighestReasoning(
 function resolveOneBuiltinProvider(
   providerId: ProviderId,
   overlays: {
+    accountProviders?: ProviderConfigMap;
     personalProviders?: ProviderConfigMap;
     models?: ModelConfigRules;
   } = {},
@@ -102,6 +110,7 @@ function resolveOneBuiltinProvider(
       ? new ProviderConfigMap([[providerId, provider]])
       : ProviderConfigMap.empty(),
     zcodeBuiltinProviderTemplates: zcodeBuiltin.providerTemplates,
+    accountProviders: overlays.accountProviders ?? ProviderConfigMap.empty(),
     personalProviders: overlays.personalProviders ?? ProviderConfigMap.empty(),
     zcodeBuiltinModelRules: zcodeBuiltin.models,
     personalModels: overlays.models ?? ModelConfigRules.empty(),

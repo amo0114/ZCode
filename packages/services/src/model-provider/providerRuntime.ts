@@ -25,6 +25,9 @@ import type {
   NativeToolSearchProbeResult,
   ProbeNativeToolSearchInput,
 } from "./nativeToolSearchProbe.js";
+import { createServiceLogger } from "#src/logger/serviceLogger.js";
+
+const log = createServiceLogger("provider-runtime");
 
 export interface ProviderRuntimeOptions extends ProviderConfigRuntimeOptions {
   readonly testConnectivity?: ProviderSettingsConnectivityTester;
@@ -142,9 +145,14 @@ function createSettingsMutationTarget(
       const [builtinResult] = await Promise.allSettled([
         configRuntime.refreshZCodeBuiltin({ force: true }),
       ]);
-      // Built-in 刷新失败时仍按当前事实刷新 Registry，再把真实错误抛给调用方。
+      // 远端更新失败不代表本地配置不可用；只降级远端更新，Config/Registry 错误仍保留。
+      if (builtinResult.status === "rejected") {
+        log.warn(undefined, "Builtin 远端更新失败，继续使用本地配置", {
+          reason,
+          error: builtinResult.reason,
+        });
+      }
       const snapshot = await registryService.refresh(reason);
-      if (builtinResult.status === "rejected") throw builtinResult.reason;
       return snapshot;
     },
   };

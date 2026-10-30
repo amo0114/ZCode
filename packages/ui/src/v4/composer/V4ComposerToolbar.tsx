@@ -17,12 +17,14 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  TID_V4_MODEL_CONFIG,
-  TID_V4_COMPOSER_INPUT,
   ZCODE_AGENT_PROVIDER,
   type ZCodeConfigOption,
   type ZCodeProvider,
 } from "@zcode/shared";
+import {
+  TID_V4_MODEL_CONFIG,
+  TID_V4_COMPOSER_INPUT,
+} from "@zcode/shared/test-ids";
 import type {
   SessionConfigState,
   SessionPhase,

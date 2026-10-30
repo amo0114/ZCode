@@ -1,6 +1,7 @@
 import {
   STREAM_RECOVERY_DISCARDED_ERROR_NAME,
   STREAM_RECOVERY_DISCARDED_FINISH,
+  ModelErrorCode,
   SessionEventType,
   TurnMachineImpl,
   traceContextToLogContext,
@@ -10,8 +11,9 @@ import type { ModelSelection } from "@zcode/contracts";
 import { isModelContextExceededError, projectExecutionErrorPayload } from "../helpers/index.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { ModelExecutionContext } from "../types.js";
+import { rebuildContextPrefix } from "./context-refresh.js";
 import { recordModelHistoryRound, type RegularTurnLoopState } from "./turn-loop-state.js";
-import { createTurnModel } from "./turn-model.js";
+import { createTurnModel, sameModelSelection } from "./turn-model.js";
 
 type SelectionFallbackDeclaration = NonNullable<ModelExecutionContext["selectionFallback"]>;
 
@@ -19,6 +21,10 @@ export interface ExecutionSelectionFallbackMatch {
   reason: SelectionFallbackDeclaration["rules"][number]["reason"];
   providerErrorCode?: string;
   statusCode?: number;
+}
+
+export interface ExecutionSelectionCreationFallbackMatch {
+  reason: "highspeed_selection_unavailable";
 }
 
 export type ExecutionFallbackCandidateSource = "declared_target" | "session_selection";
@@ -34,7 +40,31 @@ export interface ExecutionSelectionFallbackResult {
 }
 
 /**
- * 纯解析：退回目标候选按优先级排序。
+ * 纯匹配：execution-scoped Selection 在请求发出前无法解析时，退回声明目标继续本轮。
+ * Bug 根因：请求期退回只观察 adapter 归因；Provider/Model 从 Registry 消失会在 createTurnModel
+ * 阶段先失败，永远到不了该边界。这里只接收明确的 Registry 解析错误，不能吞掉配置或请求构造错误。
+ */
+export function matchExecutionSelectionCreationFallback(input: {
+  error: unknown;
+  selection: ModelSelection | undefined;
+  selectionFallback: ModelExecutionContext["selectionFallback"];
+  selectionScope: ModelExecutionContext["selectionScope"] | undefined;
+}): ExecutionSelectionCreationFallbackMatch | undefined {
+  const fallback = input.selectionFallback;
+  if (input.selectionScope !== "execution" || !input.selection || !fallback) return undefined;
+  if (input.selection.providerId !== fallback.providerId) return undefined;
+  const code =
+    typeof input.error === "object" && input.error !== null && "code" in input.error
+      ? (input.error as { code?: unknown }).code
+      : undefined;
+  if (code !== ModelErrorCode.ProviderNotFound && code !== ModelErrorCode.ModelNotFound) {
+    return undefined;
+  }
+  return { reason: "highspeed_selection_unavailable" };
+}
+
+/**
+ * 纯解析：退回目标候选按优先级排序（docs/highspeed/highspeed-card-spec.md §2.2）。
  * - 先取发起方声明的 `target`（抽卡时的提交选择，即会话原模型），再取 runtime 会话常驻 Selection。
  *   Bug 根因：退回目标曾只依赖会话常驻 Selection，而它只在 runtime 内存里——冷恢复落在 Registry
  *   刚就绪、账号权益未解析的窗口时校验失败不绑定，之后只发加速轮也不会再绑定，3402 时降级静默跳过、
@@ -65,7 +95,7 @@ export function resolveExecutionFallbackCandidates(input: {
 }
 
 /**
- * 纯匹配：本次模型请求失败是否命中执行 Selection 的退回声明。
+ * 纯匹配：本次模型请求失败是否命中执行 Selection 的退回声明（docs/highspeed/highspeed-card-spec.md §2.2）。
  * - 只看本轮 step 实际使用的模型 provider 是否就是声明 provider；失败必须明确归因到该 provider/network 边界。
  * - 用户取消与上下文超窗不参与退回：取消按取消收口，超窗交给 reactive compact（退回同模型同窗口只会再超一次）。
  * - 规则按声明顺序匹配，缺省 providerErrorCode 的规则匹配任意上游请求失败；core 不自行解释 provider 错误码，
@@ -129,7 +159,8 @@ export async function applyExecutionSelectionFallback(
   };
   const executionProviderId = String(executionModelSelection.providerId);
   const declaredTarget = state.selectionFallback?.target;
-  const sessionSelection = runtime.getSessionModelSelection();
+  // 后续输入可能已更新 Session；旧加速轮只能读取启动时固定的普通选择。
+  const sessionSelection = state.highspeedFallbackSelection;
   // 退回请求的重试预算回到默认档。
   const candidates = resolveExecutionFallbackCandidates({
     declaredTarget,
@@ -190,6 +221,9 @@ export async function applyExecutionSelectionFallback(
         ...failureAttribution,
       },
     );
+    // 没有 fallback 事件可供 Renderer 退卡，整轮错误的 code 又是 provider 错误码；把“已归因且无处可退”
+    // 记在本轮状态上，TurnError 归因据此发布（spec §2.2 失败即退卡）。
+    state.highspeedFallbackUnavailable = true;
     return { applied: false, settledAcceptedTools };
   }
   const fallbackSelection = resolved.candidate.selection;
@@ -245,7 +279,16 @@ export async function applyExecutionSelectionFallback(
   );
   await runtime.appendEvent(fallbackEvent, state.turnTraceContext);
   state.events.push(fallbackEvent);
+  // 修复原因：Context Prefix 的 Harness 文案按请求模型的 mid-conversation system 能力生成；
+  // 只换 state.model 时，退回请求仍带执行模型的文案，与实际的 reminder 通道不一致。
+  const selectionChanged = !sameModelSelection(state.model, fallbackModel);
   state.model = fallbackModel;
+  if (selectionChanged) {
+    state.turnRequestState.entries = rebuildContextPrefix(runtime, {
+      model: fallbackModel,
+      turnRequestEntries: state.turnRequestState.entries,
+    });
+  }
   // 只降级一次：退回后的普通模型若再失败，必须让整轮按真实错误失败。
   state.selectionFallback = undefined;
   if (!settledAcceptedTools) {

@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { normalizeMcpToolDescriptor } from "../src/mcp/descriptor.js";
 
-it("normalizes MCP search hints and respects server or tool alwaysLoad", () => {
+it("normalizes MCP search hints and respects server or tool alwaysLoad independently of trust", () => {
   const input = {
     name: "search",
     inputSchema: {},
@@ -11,8 +11,9 @@ it("normalizes MCP search hints and respects server or tool alwaysLoad", () => {
     alwaysLoad: true,
     searchHint: "find docs",
   });
+  expect(normalizeMcpToolDescriptor("test", input).official).toBeUndefined();
   expect(
-    normalizeMcpToolDescriptor("test", { ...input, _meta: {} }, undefined, true).alwaysLoad,
+    normalizeMcpToolDescriptor("test", { ...input, _meta: {} }, undefined, false, true).alwaysLoad,
   ).toBe(true);
   expect(
     normalizeMcpToolDescriptor("test", {

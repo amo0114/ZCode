@@ -157,3 +157,7 @@ export function resolveSubmittedExecutionState(
     planEnabled: state.planEnabled,
   };
 }
+
+export function resolveSessionFallbackModelSelection(record: V4SessionRecordView): ModelSelection {
+  return resolveSubmittedExecutionState(record, {}).modelSelection;
+}

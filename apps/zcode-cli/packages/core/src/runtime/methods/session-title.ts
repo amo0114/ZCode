@@ -17,6 +17,8 @@ import {
   SESSION_TITLE_QUERY_SOURCE,
   generateTitleCandidate,
   normalizeTitleInput,
+  retainTitleModelContext,
+  type TitleModelContext,
 } from "./title-generation-sidecar.js";
 
 const GENERATED_TITLE_EXPECTED_SOURCES: readonly SessionTitleSource[] = [
@@ -89,10 +91,12 @@ function maybeStartSessionTitleGenerationFromSeed(
   // 标题任务会越过当前 Turn 的生命周期。入队时冻结 causation，避免后续 await、
   // 调度器或实现重构使后台 Trace 静默丢失指向触发 Span 的 Link。
   const causation = this.agentTelemetry.captureCausation();
+  const modelContext = retainTitleModelContext(this);
 
   const generation = generateAndPersistSessionTitle
     .call(this, input, options.messageID, options.traceContext, {
       causation,
+      modelContext,
       goalSummaryTargetID: options.goalSummaryTargetID,
     })
     .catch(async (error) => {
@@ -111,7 +115,8 @@ function maybeStartSessionTitleGenerationFromSeed(
           traceContext: options.traceContext,
         });
       }
-    });
+    })
+    .finally(() => modelContext.release());
   void this.trackResidencyBlockingWork(generation).catch((error) => {
     this.logger?.warn("Session title fallback persistence failed", {
       ...traceContextToLogContext(options.traceContext),
@@ -129,6 +134,7 @@ function shouldAttemptSessionTitleGeneration(
   input: string,
   options: { bypassShortInputGuard?: boolean } = {},
 ): boolean {
+  if (runtime.shuttingDown) return false;
   if (runtime.sessionTitleGenerationAttempted) return false;
   if (runtime.config.titleGeneration?.enabled === false) return false;
   if (!runtime.config.titleGeneration) return false;
@@ -154,6 +160,7 @@ async function generateAndPersistSessionTitle(
   options: {
     causation?: AgentTelemetryCausation;
     goalSummaryTargetID?: string;
+    modelContext?: TitleModelContext;
   } = {},
 ): Promise<void> {
   const initialSession = await this.sessionStore?.getSession(this.sessionId);
@@ -195,6 +202,7 @@ async function generateAndPersistSessionTitle(
 
   const generated = await generateTitleCandidate.call(this, input, {
     causation: options.causation,
+    modelContext: options.modelContext,
     messageID,
     querySource: SESSION_TITLE_QUERY_SOURCE,
     traceContext,

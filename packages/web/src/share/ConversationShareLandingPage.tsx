@@ -25,7 +25,13 @@ export type ConversationShareLandingState =
   | { kind: "loading" }
   | { kind: "login_required" }
   | { kind: "ready"; preview: ConversationSharePreview }
-  | { kind: "error"; error: ConversationSharePreviewErrorKind };
+  | {
+      kind: "error";
+      error: ConversationSharePreviewErrorKind;
+      status?: number;
+      code?: number;
+      requestId?: string;
+    };
 
 function logPreviewLoadFailure(
   stage: "anonymous" | "authenticated",
@@ -51,6 +57,15 @@ interface Copy {
   notFoundTitle: string;
   notFoundDescription: string;
   backToHome: string;
+  rateLimitedTitle: string;
+  rateLimitedDescription: string;
+  serviceUnavailableTitle: string;
+  serviceUnavailableDescription: string;
+  featureDisabledTitle: string;
+  featureDisabledDescription: string;
+  errorDetails: string;
+  requestId: string;
+  errorCode: string;
   networkTitle: string;
   networkDescription: string;
   invalidTitle: string;
@@ -84,10 +99,19 @@ const COPY: Record<ConversationShareLandingLocale, Copy> = {
     notFoundTitle: "找不到分享内容",
     notFoundDescription: "链接可能无效、分享已被移除，或当前登录账号无法访问。",
     backToHome: "回到首页",
+    rateLimitedTitle: "访问过于频繁",
+    rateLimitedDescription: "请稍后重试。",
+    serviceUnavailableTitle: "分享服务暂时异常",
+    serviceUnavailableDescription: "请稍后重试；若仍失败，请提供错误详情。",
+    featureDisabledTitle: "分享服务暂未开放",
+    featureDisabledDescription: "请稍后再试。",
+    errorDetails: "错误详情",
+    requestId: "服务端请求 ID",
+    errorCode: "错误码",
     networkTitle: "暂时无法加载分享",
     networkDescription: "请检查网络后重试。",
-    invalidTitle: "分享格式无效",
-    invalidDescription: "服务返回的分享内容无法通过安全校验。",
+    invalidTitle: "无法读取分享内容",
+    invalidDescription: "分享服务返回了无法识别的数据，请提供错误详情。",
     outdatedTitle: "需要更新 ZCode",
     outdatedDescription: "这个分享由更新版本的 ZCode 创建，请升级后再查看。",
     unavailableTitle: "分享不可访问",
@@ -112,10 +136,20 @@ const COPY: Record<ConversationShareLandingLocale, Copy> = {
     notFoundDescription:
       "The link may be invalid, the share may have been removed, or your current account may not have access.",
     backToHome: "Back to home",
+    rateLimitedTitle: "Too many requests",
+    rateLimitedDescription: "Try again later.",
+    serviceUnavailableTitle: "Sharing service unavailable",
+    serviceUnavailableDescription: "Try again later. If this persists, provide the error details.",
+    featureDisabledTitle: "Sharing is currently unavailable",
+    featureDisabledDescription: "Try again later.",
+    errorDetails: "Error details",
+    requestId: "Server request ID",
+    errorCode: "Error code",
     networkTitle: "Unable to load share",
     networkDescription: "Check your network connection and try again.",
-    invalidTitle: "Invalid share content",
-    invalidDescription: "The shared content failed the public safety contract.",
+    invalidTitle: "Unable to read shared content",
+    invalidDescription:
+      "The sharing service returned unrecognized data. Provide the error details.",
     outdatedTitle: "Update ZCode to continue",
     outdatedDescription:
       "This share was created by a newer version of ZCode. Please update to view it.",
@@ -514,6 +548,7 @@ export function ConversationShareLandingPage({
         ) : null}
         <ConversationShareReadonlyTimeline
           rows={preview.rows}
+          contentBlocks={preview.content_blocks}
           unsupportedRowCount={preview.unsupportedRowCount}
           locale={resolvedLocale}
           theme={theme}
@@ -558,17 +593,26 @@ export function ConversationShareLandingStatus({
       ? { title: copy.loading, description: copy.loadingDescription }
       : state.kind === "login_required"
         ? { title: copy.unavailableTitle, description: copy.unavailableDescription }
-        : state.error === "expired"
-          ? { title: copy.expiredTitle, description: copy.expiredDescription }
-          : state.error === "not_found"
-            ? { title: copy.notFoundTitle, description: copy.notFoundDescription }
-            : state.error === "unsupported_schema_version"
-              ? { title: copy.outdatedTitle, description: copy.outdatedDescription }
-              : state.error === "invalid_contract"
-                ? { title: copy.invalidTitle, description: copy.invalidDescription }
-                : state.error === "authentication_required"
-                  ? { title: copy.unavailableTitle, description: copy.unavailableDescription }
-                  : { title: copy.networkTitle, description: copy.networkDescription };
+        : state.error === "rate_limited"
+          ? { title: copy.rateLimitedTitle, description: copy.rateLimitedDescription }
+          : state.error === "feature_disabled"
+            ? { title: copy.featureDisabledTitle, description: copy.featureDisabledDescription }
+            : state.error === "service_unavailable" || state.error === "unknown"
+              ? {
+                  title: copy.serviceUnavailableTitle,
+                  description: copy.serviceUnavailableDescription,
+                }
+              : state.error === "expired"
+                ? { title: copy.expiredTitle, description: copy.expiredDescription }
+                : state.error === "not_found"
+                  ? { title: copy.notFoundTitle, description: copy.notFoundDescription }
+                  : state.error === "unsupported_schema_version"
+                    ? { title: copy.outdatedTitle, description: copy.outdatedDescription }
+                    : state.error === "invalid_contract"
+                      ? { title: copy.invalidTitle, description: copy.invalidDescription }
+                      : state.error === "authentication_required"
+                        ? { title: copy.unavailableTitle, description: copy.unavailableDescription }
+                        : { title: copy.networkTitle, description: copy.networkDescription };
   const requiresAccess =
     state.kind === "login_required" ||
     (state.kind === "error" && state.error === "authentication_required");
@@ -585,7 +629,11 @@ export function ConversationShareLandingStatus({
     !requiresAccess &&
     !(
       state.kind === "error" &&
-      (state.error === "expired" || state.error === "unsupported_schema_version")
+      (state.error === "expired" ||
+        state.error === "unsupported_schema_version" ||
+        state.error === "feature_disabled" ||
+        state.error === "not_found" ||
+        state.error === "invalid_contract")
     );
   return (
     <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-4 py-8 text-foreground">
@@ -593,6 +641,23 @@ export function ConversationShareLandingStatus({
         <div className="mb-4 text-ui-sm font-medium text-brand">{copy.brand}</div>
         <h1 className="text-ui-xl font-semibold">{content.title}</h1>
         <p className="mt-3 text-ui-base leading-6 text-foreground-subtle">{content.description}</p>
+        {state.kind === "error" &&
+        (state.status !== undefined || state.code !== undefined || state.requestId) ? (
+          <details className="mt-4 text-ui-xs text-foreground-subtle">
+            <summary className="cursor-pointer">{copy.errorDetails}</summary>
+            {[
+              ["HTTP", state.status],
+              [copy.errorCode, state.code],
+              [copy.requestId, state.requestId],
+            ].map(([label, value]) =>
+              value === undefined ? null : (
+                <p key={label} className="mt-1 break-all select-text">
+                  {label}: {value}
+                </p>
+              ),
+            )}
+          </details>
+        ) : null}
         {canRetry || isNotFound ? (
           <div className="mt-5 flex flex-wrap gap-2">
             {canRetry ? (
@@ -664,19 +729,25 @@ export function ConversationShareLandingLoader({
         error && typeof error === "object" && "kind" in error
           ? (error as ConversationSharePreviewClientError).kind
           : "network";
+      const failure = error as Partial<ConversationSharePreviewClientError> | null;
+      const diagnostics = {
+        status: failure?.status,
+        code: failure?.code,
+        requestId: failure?.requestId,
+      };
       logPreviewLoadFailure(initialToken ? "authenticated" : "anonymous", error, kind);
       if (kind === "authentication_required" || kind === "not_found") {
         // 带过 token 还失败就没有第二次机会了：要么本地登录态已失效（让宿主清理并重新登录），
         // 要么服务端确实不认这个访问者。
         if (initialToken) {
-          setState({ kind: "error", error: kind });
+          setState({ kind: "error", error: kind, ...diagnostics });
           if (kind === "authentication_required") onLogout?.();
           return;
         }
         setState({ kind: "login_required" });
         return;
       }
-      setState({ kind: "error", error: kind });
+      setState({ kind: "error", error: kind, ...diagnostics });
     }
   }, [client, getAccessToken, onLogout, shareCode]);
   useEffect(() => {

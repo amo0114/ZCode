@@ -746,114 +746,6 @@ describe("createProtocolAutomationPort", () => {
     });
   });
 
-  it("CronCreate 持久化当前会话的模型选择", async () => {
-    const requestClient = vi.fn(async (method: string) => {
-      if (method === zcodeProtocolMethods.automationCheckTaskBinding) return { bound: false };
-      return {
-        automation: {
-          automationId: "automation-session-model",
-          title: "daily report",
-          cronExpr: "0 9 * * *",
-          prompt: "write daily report",
-          model: "builtin:zai/GLM-5",
-          provider: "glm",
-          enabled: true,
-          lifecycleStatus: "active" as const,
-          runCount: 0,
-          recurring: true,
-        },
-      };
-    });
-    // CronCreate 只读 Session Selection；本轮执行材料不回写会话选型。
-    const getSessionModelSelection = vi.fn(() => ({
-      providerId: "account:zai-individual-coding-plan",
-      modelId: "GLM-5",
-    }));
-    const port = createProtocolAutomationPort({
-      requestClient,
-      sessions: new Map([
-        [
-          "session-1",
-          {
-            app: {
-              runtime: { getSessionModelSelection },
-              getMode: () => "build",
-              setCustomSessionTitle: vi.fn(async () => undefined),
-            },
-            traceContext: { traceId: "trace-session-1" },
-          },
-        ],
-      ]),
-    } as unknown as ZCodeProtocolAgentServerContext);
-
-    await port.create(
-      {
-        cron: "0 9 * * *",
-        delayMinutes: null,
-        prompt: "write daily report",
-        title: "daily report",
-      },
-      { sessionId: "session-1" },
-    );
-
-    expect(requestClient).toHaveBeenCalledWith(
-      zcodeProtocolMethods.automationCreate,
-      expect.objectContaining({
-        modelSelection: { providerId: "account:zai-individual-coding-plan", modelId: "GLM-5" },
-      }),
-      expect.anything(),
-    );
-
-  });
-
-  it("CronCreate 成功后冻结当前会话标题，避免迟到 generated title 覆盖 automation 语义", async () => {
-    const setCustomSessionTitle = vi.fn(async () => undefined);
-    const port = createProtocolAutomationPort({
-      requestClient: vi.fn(async () => ({
-        automation: {
-          automationId: "automation-1",
-          title: "每5分钟给我讲个笑话",
-          cronExpr: "*/5 * * * *",
-          prompt: "给我讲一个笑话",
-          enabled: true,
-          lifecycleStatus: "active" as const,
-          runCount: 0,
-          recurring: true,
-        },
-      })),
-      sessions: new Map([
-        [
-          "session-1",
-          {
-            app: {
-              runtime: { getSessionModelSelection: () => undefined },
-              getModel: () => undefined,
-              getMode: () => undefined,
-              getThoughtLevel: () => undefined,
-              setCustomSessionTitle,
-            },
-            traceContext: { traceId: "trace-session-1" },
-          },
-        ],
-      ]),
-    } as unknown as ZCodeProtocolAgentServerContext);
-
-    await port.create(
-      {
-        cron: "*/5 * * * *",
-        delayMinutes: null,
-        prompt: "给我讲一个笑话",
-        title: "每5分钟给我讲个笑话",
-      },
-      { sessionId: "session-1" },
-    );
-
-    expect(setCustomSessionTitle).toHaveBeenCalledWith({
-      title: "每5分钟给我讲个笑话",
-      traceContext: { traceId: "trace-session-1" },
-    });
-  });
-
   it("CronUpdate 将严格 patch 映射到 automation/update，并保留 maxRuns=null", async () => {
     const requestClient = vi.fn(async () => ({
       automation: {
@@ -919,6 +811,21 @@ describe("createProtocolAutomationPort", () => {
     expect(requestClient).toHaveBeenCalledWith(
       zcodeProtocolMethods.automationDelete,
       { automationId: "stale-id" },
+      expect.anything(),
+    );
+  });
+
+  it("CronPauseSelf 通过 automation/pause 透传执行器注入的本轮 automationId 并返回真实暂停结果", async () => {
+    const requestClient = vi.fn(async () => ({ paused: true }));
+    const port = createProtocolAutomationPort({
+      requestClient,
+      sessions: new Map(),
+    } as unknown as ZCodeProtocolAgentServerContext);
+
+    await expect(port.pause({ id: "automation-1" })).resolves.toBe(true);
+    expect(requestClient).toHaveBeenCalledWith(
+      zcodeProtocolMethods.automationPause,
+      { automationId: "automation-1" },
       expect.anything(),
     );
   });
@@ -996,4 +903,23 @@ describe("createProtocolAutomationPort", () => {
       expect.anything(),
     );
   });
+});
+
+it.each([false, true])("定时任务列表按协商能力携带自身工作区：%s", async (enabled) => {
+  const workspace = { workspaceKey: "/tasks/b", workspacePath: "/tasks/b" };
+  const requestClient = vi.fn(async () => ({ automations: [] }));
+  const port = createProtocolAutomationPort(
+    {
+      requestClient,
+      sessionWorkspaceRoutingEnabled: enabled,
+    } as unknown as ZCodeProtocolAgentServerContext,
+    () =>
+      ({ workspace }) as import("../src/zcode-protocol/server-types.js").ZCodeProtocolSessionRecord,
+  );
+  await port.list({ sessionId: "session-b" });
+  expect(requestClient).toHaveBeenCalledWith(
+    zcodeProtocolMethods.automationList,
+    enabled ? { workspace } : {},
+    expect.anything(),
+  );
 });

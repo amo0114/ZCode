@@ -2,7 +2,7 @@ import type { ZCodeEnv } from "./env.js";
 
 export const DEFAULT_ZCODE_ENDPOINT_ORIGIN = "https://zcode.z.ai";
 export const TEST_ZCODE_ENDPOINT_ORIGIN = "https://zcode.z.ai";
-export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.z.ai/ws";
+export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.z.ai/api/v1/remote/ws2";
 export const WEB_REMOTE_CONTROL_V4_MIN_APP_VERSION = "3.4.0";
 
 export interface BuildZCodeEndpointUrlsOptions {
@@ -154,13 +154,12 @@ export function resolveWebRemoteControlRelayWsUrl(options?: {
     return overrideUrl;
   }
 
-  // Bugfix：标准 test endpoint 已部署独立 relay；继续固定到生产 relay 会让测试环境跨环境配对。
-  // 仅识别规范 test origin，避免改变 production、localhost 和其他自定义 endpoint 的既有行为。
-  if (options?.endpointOrigin?.trim() === TEST_ZCODE_ENDPOINT_ORIGIN) {
-    return "wss://zcode.z.ai/ws";
-  }
-
-  return DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL;
+  const origin = new URL(
+    normalizeZCodeEndpointOrigin(options?.endpointOrigin?.trim() || DEFAULT_ZCODE_ENDPOINT_ORIGIN),
+  );
+  origin.protocol = origin.protocol === "https:" ? "wss:" : "ws:";
+  origin.pathname = "/api/v1/remote/ws2";
+  return origin.toString();
 }
 
 export function buildZCodeEndpointUrls(
@@ -178,7 +177,7 @@ export function buildZCodeEndpointUrls(
     origin: normalizedOrigin,
     apiBaseUrl: `${normalizedOrigin}/api/v1`,
     remoteUrl: `${normalizedOrigin}/remote/${remoteVersion}`,
-    relayWsUrl: `${wsOrigin}/ws`,
+    relayWsUrl: `${wsOrigin}/api/v1/remote/ws2`,
   };
 }
 

@@ -38,11 +38,11 @@ import { CuaGroupToolCallBlock } from "@/ToolCallBlocks/renderers/cua-group.js";
 import { GoalToolCallBlock } from "@/ToolCallBlocks/renderers/goal.js";
 import { NodeReplToolCallBlock } from "@/ToolCallBlocks/renderers/node-repl.js";
 import { McpToolCallBlock, readMcpToolPresentation } from "@/ToolCallBlocks/renderers/mcp.js";
-import * as PluginUi from "@/plugin-ui/index.js";
 import { PlanGuidanceToolCallBlock } from "@/ToolCallBlocks/renderers/plan-guidance.js";
 import { ReadToolCallBlock } from "@/ToolCallBlocks/renderers/read.js";
 import { ReadSessionContextToolCallBlock } from "@/ToolCallBlocks/renderers/read-session-context.js";
 import { RespondToCoordinatorToolCallBlock } from "@/ToolCallBlocks/renderers/respond-to-coordinator.js";
+import { WebFetchToolCallBlock } from "@/ToolCallBlocks/renderers/web-fetch.js";
 import { SearchToolCallBlock, ToolSearchToolCallBlock } from "@/ToolCallBlocks/renderers/search.js";
 import { SendMessageToolCallBlock } from "@/ToolCallBlocks/renderers/send-message.js";
 import { SkillToolCallBlock } from "@/ToolCallBlocks/renderers/skill.js";
@@ -73,7 +73,9 @@ export function resolveToolCallRenderer(context: ToolCallBlockRenderContext) {
 
   // 工具目录查询只复用搜索卡片；不改 search family，避免被聚合为 Explore 内容搜索。
   const toolCall = context.toolCallNode.toolCall;
-  if ((toolCall.toolName ?? toolCall.kind) === "ToolSearch") {
+  const toolName = toolCall.toolName ?? toolCall.kind;
+  // 参数生成和中途停止尚未经过执行归一化，必须让 Local 名称也复用同一卡片与文案。
+  if (toolName === "ToolSearch" || toolName === "LocalToolSearch") {
     return ToolSearchToolCallBlock;
   }
 
@@ -128,7 +130,6 @@ export function resolveToolCallRenderer(context: ToolCallBlockRenderContext) {
   if (identity.family === "node-repl") {
     return NodeReplToolCallBlock;
   }
-  if (PluginUi.shouldRenderPluginUi(context)) return PluginUi.PluginUiToolCallBlock;
   if (readMcpToolPresentation(context)) {
     return McpToolCallBlock;
   }
@@ -169,6 +170,8 @@ export function resolveToolCallRenderer(context: ToolCallBlockRenderContext) {
       return ExploreToolCallBlock;
     case "switch-mode":
       return SwitchModeToolCallBlock;
+    case "web-fetch":
+      return WebFetchToolCallBlock;
     case "search":
       return SearchToolCallBlock;
     case "shell":

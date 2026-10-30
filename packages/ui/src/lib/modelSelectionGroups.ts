@@ -25,6 +25,7 @@ export function buildRegistryModelSelectGroups(
       {
         key: `registry-provider:${provider.providerId}`,
         label: provider.providerName?.trim() || provider.providerId,
+        ...(provider.config.logo ? { logo: provider.config.logo } : {}),
         items: provider.models.map(({ modelId, config }) => ({
           key: `registry-provider:${provider.providerId}:${modelId}`,
           value: encodeCustomModelValue(provider.providerId, modelId),

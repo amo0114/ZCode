@@ -18,3 +18,15 @@ export type RequestVerificationRecoveryAction = never;
 export const requestVerificationActionMessages = {};
 export const requestVerificationErrorAttribution = {};
 export const additionalRequestModalSelectors: readonly string[] = [];
+
+export function resolveRequestSecurityErrorMessageId(_error: {
+  code?: string;
+  message?: string;
+}): string | undefined {
+  return undefined;
+}
+export function isRequestVerificationConfigNetworkError(
+  _error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  return false;
+}

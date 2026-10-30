@@ -18,6 +18,18 @@ import { createRuntimeModel } from "./runtime-model.js";
 import { cloneModelSelection } from "../model-selection.js";
 import { auxiliaryModelOptions } from "../../model/auxiliary-model-options.js";
 
+export interface TitleModelContext {
+  selection: ModelSelection | undefined;
+  release(): void;
+}
+
+export function retainTitleModelContext(runtime: AgentRuntimeInternal): TitleModelContext {
+  // 标题先异步读库，主轮可能在此期间结束；必须在入队时冻结选择。
+  const selection =
+    runtime.config.titleGeneration?.modelSelection ?? runtime.getSessionModelSelection();
+  return { selection: selection && cloneModelSelection(selection), release() {} };
+}
+
 export const SESSION_TITLE_QUERY_SOURCE = "session_title";
 export const GOAL_SUMMARY_TITLE_QUERY_SOURCE = "goal_summary_title";
 
@@ -56,6 +68,7 @@ export async function generateTitleCandidate(
     messageID?: MessageId;
     querySource: string;
     traceContext: TraceContext;
+    modelContext?: TitleModelContext;
   },
 ): Promise<{ modelSelection: ModelSelection; title: string; traceContext: TraceContext } | null> {
   const titleTelemetry = this.agentTelemetry.detached({
@@ -90,10 +103,11 @@ async function generateTitleCandidateImpl(
     messageID?: MessageId;
     querySource: string;
     traceContext: TraceContext;
+    modelContext?: TitleModelContext;
   },
 ): Promise<{ modelSelection: ModelSelection; title: string; traceContext: TraceContext } | null> {
-  const requestedModelSelection =
-    this.config.titleGeneration?.modelSelection ?? this.getSessionModelSelection();
+  const context = options.modelContext ?? retainTitleModelContext(this);
+  const requestedModelSelection = context.selection;
   if (!requestedModelSelection) return null;
   const baseModel = createRuntimeModel(this, {
     selection: requestedModelSelection,
@@ -123,9 +137,12 @@ async function generateTitleCandidateImpl(
   await this.appendEvent(modelRequestEvent, modelTraceContext);
   events.push(modelRequestEvent);
   const networkEventStartIndex = events.length;
-  const titleAbortSignal = AbortSignal.timeout(
-    positiveTimeoutMs(this.config.titleGeneration?.timeoutMs),
-  );
+  // title 跨 turn 存活，但不能跨所属 runtime 的关闭；超时与关闭共用实际请求取消链。
+  const titleAbortSignal = AbortSignal.any([
+    this.shutdownSignal,
+    AbortSignal.timeout(positiveTimeoutMs(this.config.titleGeneration?.timeoutMs)),
+  ]);
+  titleAbortSignal.throwIfAborted();
   const modelStartedAt = Date.now();
   const invocationContext = {
     metadata: traceContextToLogContext(modelTraceContext),

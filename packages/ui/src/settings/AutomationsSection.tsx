@@ -3,16 +3,18 @@ import { useCallback, useEffect, useState, type ComponentType, type SVGProps } f
 import { CircleCheck, RotateCcw, TriangleAlert } from "lucide-react";
 import {
   AUTOMATION_CREATE_LIMIT,
+  isAutomationCreateLimitError,
+  resolveWorkspaceKey,
+  type ZCodeAutomation,
+} from "@zcode/shared";
+import {
   TID_AUTOMATION_ACTION_DELETE,
   TID_AUTOMATION_ACTION_TOGGLE,
   TID_AUTOMATION_CARD,
   TID_AUTOMATION_CARD_MENU,
   TID_AUTOMATIONS_LIST,
   TID_AUTOMATIONS_STATUS_FILTER,
-  isAutomationCreateLimitError,
-  resolveWorkspaceKey,
-  type ZCodeAutomation,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import {
   DropdownMenu,

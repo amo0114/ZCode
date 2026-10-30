@@ -42,6 +42,7 @@ import {
   clonePartForFork,
   emptyTokenUsageInfo,
   formatConversationForkNoticeBody,
+  isHiddenReminderMessage,
   slugify,
 } from "../helpers/index.js";
 import type { AgentRuntimeInternal } from "../internal.js";
@@ -68,6 +69,8 @@ function stableForkError(message: string, context: Record<string, unknown> = {})
 const MODEL_SELECTION_ENTRY_SUFFIX = ":runtime-model-selection";
 
 function modelSelectionFromMessage(message: MessageWithParts): ModelSelection | undefined {
+  // 隐藏提醒（如停止后的中断标记）只记 provider/model，不带 options，不是这一点的选型事实。
+  if (isHiddenReminderMessage(message)) return undefined;
   return persistedModelSelectionOfMessage(message);
 }
 

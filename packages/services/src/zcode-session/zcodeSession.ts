@@ -56,7 +56,6 @@ export interface ZCodeSessionResumeParams extends ZCodeTaskTarget {
 }
 
 export interface ZCodeSessionListParams extends ZCodeSessionWorkspaceTarget {
-  includeArchived?: boolean;
   limit?: number;
 }
 

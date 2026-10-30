@@ -7,7 +7,7 @@ import {
   TID_SETTINGS_PERSONALIZATION_EDITOR,
   TID_SETTINGS_PERSONALIZATION_SAVE,
   TID_SETTINGS_PERSONALIZATION_SIZE_HINT,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import { toast } from "@/components/ui/toast.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";

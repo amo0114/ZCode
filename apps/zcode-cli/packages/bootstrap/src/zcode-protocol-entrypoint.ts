@@ -1,4 +1,5 @@
-import { createConfig } from "@zcode/adapters/config";
+import { createMcpTransportFetch } from "@zcode/adapters";
+import { createConfig, resolvePath } from "@zcode/adapters/config";
 import type { McpElicitationPort, McpNotificationPort } from "@zcode/contracts";
 import { createNodeModelSelectionFacade } from "@zcode/provider-node";
 import { createNodeLoggerFactory } from "@zcode/adapters/logging";
@@ -13,7 +14,7 @@ import {
   type ZCodeMcpResourceSample,
   type ZCodeMcpTelemetryEvent,
 } from "@zcode/shared";
-import type { SqliteSessionStore } from "@zcode/adapters/storage";
+import { createNodeSessionDataFiles, type SqliteSessionStore } from "@zcode/adapters/storage";
 import { traceContextToLogContext, createRootTraceContext } from "@zcode/contracts";
 import type { McpPort, ModelSelection } from "@zcode/contracts";
 import type { PresentationSurface } from "@zcode/core";
@@ -28,6 +29,8 @@ import {
   prepareProtocolStartupStorage,
 } from "./zcode-protocol/storage-startup.js";
 import { closeSessionStore, getSessionDbPath } from "./app/session-store.js";
+import { resolveMcpNodeFallbackProvider } from "./app/mcp-node-fallback.js";
+import { getCliStorageRoot, getProjectMemoryRoot } from "./app/paths.js";
 import { startProcessProviderRegistryRuntime } from "./app/process-provider-registry-runtime.js";
 import { scheduleStartupLogRetentionCleanup } from "./log-retention.js";
 import { StartupTimer, startupNow } from "./startup-logging.js";
@@ -206,11 +209,16 @@ export async function runZCodeProtocolAgent(
               noProxy: configResult.config.network.noProxy,
               caCertFile: configResult.config.network.caCertFile,
             },
+            nodeFallback: resolveMcpNodeFallbackProvider({
+              cliStorageRoot: getCliStorageRoot(resolvePath(configResult.config.storage.dir)),
+              logger,
+            }),
             telemetry: mcpTelemetryTracker,
             workingDirectory: options.cwd,
           });
     mcpPort = mcpConnectionPool?.acquireLease({ leaseId: "protocol-settings" });
     const activeProviderRegistryRuntime = providerRegistryRuntime;
+    const protocolCliStorageRoot = getCliStorageRoot(resolvePath(configResult.config.storage.dir));
     const modelSelectionFacade = createNodeModelSelectionFacade(
       activeProviderRegistryRuntime.runtime.registryService,
     );
@@ -256,6 +264,12 @@ export async function runZCodeProtocolAgent(
       mcpPort,
       mcpTelemetry: mcpTelemetryTracker,
       sessionStore,
+      sessionDataFiles: createNodeSessionDataFiles({
+        cliStorageRoot: protocolCliStorageRoot,
+        // 与会话运行时的记忆解析同一函数，删除的正是 CLI 读写的那个目录。
+        memoryRoot: ({ workspacePath, workspaceIdentity }) =>
+          getProjectMemoryRoot(protocolCliStorageRoot, workspacePath, workspaceIdentity),
+      }),
       refreshProviderRegistry: async (reason) => {
         await activeProviderRegistryRuntime.runtime.registryService.refresh(reason);
       },

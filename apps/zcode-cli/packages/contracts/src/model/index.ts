@@ -225,6 +225,8 @@ export interface ModelRequestCompletedStatusEvent extends ModelNetworkStatusBase
 
 export interface ModelRequestFailedStatusEvent extends ModelNetworkStatusBase {
   type: "model_request_failed";
+  /** Provider 已报告的失败请求用量；不为失败响应伪造成功完成事件。 */
+  usage?: ModelUsage;
   durationMs?: number;
   reason: ModelFailureReason;
   retryable: boolean;
@@ -816,6 +818,17 @@ export type ModelStreamEvent =
   | {
       type: "tool_call";
       toolCall: ModelToolCall;
+    }
+  | {
+      /**
+       * Provider 在服务端执行完内置工具（toolCall.providerExecuted）后随流下发的结果。
+       * 客户端不执行这类工具，只用于展示、持久化和下一次请求回放。
+       */
+      type: "provider_tool_result";
+      toolCallId: string;
+      toolName: string;
+      output: unknown;
+      isError: boolean;
     }
   | {
       type: "finish";

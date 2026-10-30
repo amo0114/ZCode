@@ -1,6 +1,9 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TID_AUTOMATION_CREATE_MANUALLY, TID_AUTOMATIONS_OPEN } from "@zcode/shared";
+import {
+  TID_AUTOMATION_CREATE_MANUALLY,
+  TID_AUTOMATIONS_OPEN,
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,

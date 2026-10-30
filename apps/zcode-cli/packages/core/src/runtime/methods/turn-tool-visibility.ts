@@ -1,6 +1,7 @@
 import type { AgentRuntimeInternal } from "../internal.js";
 import {
   AUTOMATION_MUTATION_TOOL_NAMES,
+  AUTOMATION_SELF_PAUSE_TOOL_NAME,
   isAutomationMutationRestrictedTurn,
   type RegularTurnLoopState,
 } from "./turn-loop-state.js";
@@ -20,6 +21,12 @@ function buildTurnDisallowedTools(state: RegularTurnLoopState): Set<string> | nu
     for (const toolName of AUTOMATION_MUTATION_TOOL_NAMES) {
       tools.add(toolName);
     }
+  }
+  if (!state.automationId?.trim()) {
+    // CronPauseSelf 的唯一目标是 Host 准入注入的本轮 automationId；普通用户轮、
+    // 只有 denylist / queryId 兜底信号的轮都没有可暂停的任务，必须在 provider 边界隐藏。
+    // 不并入 AUTOMATION_MUTATION_TOOL_NAMES：那组是“执行轮隐藏”，这里是“非执行轮隐藏”。
+    tools.add(AUTOMATION_SELF_PAUSE_TOOL_NAME);
   }
   return tools.size > 0 ? tools : null;
 }

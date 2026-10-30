@@ -132,6 +132,10 @@ export type RevokeWorkspaceHookTrustInput =
 export type ZCodeAppRuntimeConfigInput = AgentRuntimeConfig;
 
 export interface ZCodeAppOptions {
+  /** 独立 CLI 的配置菜单编辑输入默认值；其他装配保留显式 Session 配置语义。 */
+  modelSelectionMode?: "cli-default";
+  /** Host 在运行实例创建时传入，运行中不刷新。 */
+  additionalDirectories?: readonly string[];
   sessionId?: SessionId;
   resume?: boolean;
   version?: string;
@@ -248,8 +252,6 @@ export interface SteerTurnOptions {
 
 export type SendInputOptions = SubmitPromptOptions & {
   inputId?: string;
-  /** 可信消费入口确定的呈现标记；不改变原始用户内容或调度语义。 */
-  inputPresentation?: ExecuteTurnOptions["inputPresentation"];
   delivery?: InputDelivery;
   /** sendText 的产品 guide/queue 意图；是否 busy 仍由 Core admission 判断。 */
   queueDelivery?: "guide" | "queue";
@@ -328,6 +330,8 @@ export interface ZCodeApp {
    * coordinator 并重发 admission 状态，否则已信任 Hook 继续被拒、banner 不刷新。
    */
   reloadWorkspaceHookTrust(): Promise<void>;
+  /** 设置授权落盘后更新同工作区会话的提示；不自动连接。 */
+  reloadWorkspaceMcpTrust?(): Promise<void>;
   close?(): Promise<void>;
   getMode(): CollaborationMode;
   getModel(): string;
@@ -421,6 +425,9 @@ export interface ZCodeApp {
   ): Promise<McpReadResourceResult>;
   onMcpAppConnectionInvalidated(serverName: string, listener: () => void): () => void;
   getMcpAppConnectionSnapshot(serverName: string): { identity: string; generation: number } | null;
+  waitForMcpAppConnection(
+    serverName: string,
+  ): Promise<{ identity: string; generation: number } | null>;
   callMcpToolForUi(
     serverName: string,
     toolName: string,

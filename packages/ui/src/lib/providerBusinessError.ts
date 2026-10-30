@@ -39,6 +39,7 @@ export const PROVIDER_BUSINESS_ERROR_CODES = [
   "3010",
   "3002",
   "3102",
+  "3106",
   "2007",
   "429",
 ] as const;
@@ -64,6 +65,7 @@ export const PROVIDER_BUSINESS_ERROR_MESSAGE_IDS: Record<ProviderBusinessErrorCo
   "3009": "zcode.error.providerBusiness.3009",
   "3010": "zcode.error.providerBusiness.3010",
   "3102": "zcode.error.providerBusiness.3102",
+  "3106": "zcode.error.providerBusiness.3106",
   "2007": "zcode.error.providerBusiness.2007",
   "429": "zcode.error.providerBusiness.429",
 };
@@ -96,6 +98,7 @@ const PROVIDER_BUSINESS_ERROR_UI_ACTIONS: Record<
   "3002": "retry-later",
   // 3102：单段运行时间到顶，横幅里的重试/切模型都救不回来。
   "3102": null,
+  "3106": null,
   "2007": "retry-later",
   "429": "retry-later",
 };

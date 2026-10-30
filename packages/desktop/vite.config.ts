@@ -150,7 +150,23 @@ function stripViteRequestQuery(id: string) {
   return id.split("?")[0] ?? id;
 }
 
-export default defineConfig(({ mode }) => {
+function createReactScanDevPlugin(): Plugin {
+  const scriptPath = normalizePathForVite(desktopRequire.resolve("react-scan/dist/auto.global.js"));
+  return {
+    name: "zcode:react-scan",
+    apply: "serve",
+    transformIndexHtml: {
+      order: "post",
+      handler(_html, context) {
+        if (context.path !== "/index.html") return [];
+        // Scan 必须先安装 hook，再加载 React；普通 head script 保证顺序，避免异步导入漏掉首次挂载。
+        return [{ tag: "script", attrs: { src: `/@fs/${scriptPath}` }, injectTo: "head-prepend" }];
+      },
+    },
+  };
+}
+
+export default defineConfig(({ command, mode }) => {
   // `.env*` 只提供链接常量；当前产品环境由启动脚本或 CI 注入 ZCODE_ENV。
   const env = loadEnv(mode, "../..", "");
   const repoRoot = resolve(__dirname, "../..");
@@ -173,6 +189,10 @@ export default defineConfig(({ mode }) => {
       (zcodeEnv === "production" ? env.ZCODE_PRODUCTION_BASE_URL : env.ZCODE_TEST_BASE_URL),
   });
   const plugins = [
+    // 仅开发服务器装配，所有 build 都不注入；后端 ZCODE_ENV 不决定是否开启开发工具。
+    ...(command === "serve" && mode !== "production" && env.ZCODE_REACT_SCAN !== "0"
+      ? [createReactScanDevPlugin()]
+      : []),
     ...(e2eCoverageEnabled ? [createE2EUIRendererCoveragePlugin(repoRoot)] : []),
     pdfJsCMapsPlugin(),
     react(),
@@ -200,6 +220,7 @@ export default defineConfig(({ mode }) => {
     server: { port: 5174, strictPort: true },
     define: {
       __ZCODE_VERSION__: JSON.stringify(buildMetadata.appVersion),
+      __ZCODE_MIN_COMPATIBLE_VERSION__: JSON.stringify(buildMetadata.minCompatibleVersion),
       __ZCODE_COMMIT__: JSON.stringify(buildMetadata.buildCommitId),
       __ZCODE_BUILD_TIME__: JSON.stringify(buildMetadata.buildTime),
       __ZCODE_ENV__: JSON.stringify(zcodeEnv),

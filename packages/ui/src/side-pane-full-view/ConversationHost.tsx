@@ -1,4 +1,3 @@
-/* oxlint-disable eslint(max-lines) -- 沿用上游实现：单一 SessionPane 的定位、浮动 composer 与过渡动画共享同一组 ref/状态，拆分会割裂这一不变量。 */
 // Side Pane 完整视图的对话宿主（spec：docs/ui/side-pane-full-view.md）。
 // 它包住 conversation-column 里唯一的 SessionPane 实例，只改变定位方式，不移动 DOM、不重挂载：
 // - normal：静态布局，与原三栏一致；
@@ -40,7 +39,7 @@ import {
   TID_SIDE_PANE_FULL_VIEW_MINIMIZE,
   TID_SIDE_PANE_FULL_VIEW_RUNNING,
   TID_V4_COMPOSER_INPUT,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 import {
