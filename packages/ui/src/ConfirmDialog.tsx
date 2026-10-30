@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox.js";
-import { XIcon } from "lucide-react";
+import { XIcon, TriangleAlertIcon, FolderIcon, SquareTerminalIcon, GlobeIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog.js";
 import { TID_CONFIRM_DIALOG_CONFIRM } from "@zcode/shared";
 import { Button } from "@/components/ui/button.js";
 import {
@@ -39,12 +49,17 @@ export function ConfirmDialogHost() {
     request: typeof displayedRequest;
     checked: boolean;
   }>({ request: undefined, checked: false });
+  // 勾选只属于本次请求，关闭后再次打开不能沿用上次的风险确认。
+  const checkboxChecked =
+    checkboxSelection.request === displayedRequest && checkboxSelection.checked;
   const open = Boolean(pendingRequest);
   const isAutomationConfirmation = displayedRequest?.presentation === "automation-confirmation";
+  const isYoloConfirmation = displayedRequest?.presentation === "yolo-confirmation";
   const confirmLabel =
     displayedRequest?.confirmLabel ?? intl.formatMessage({ id: "common.confirm" });
   const cancelLabel = displayedRequest?.cancelLabel ?? intl.formatMessage({ id: "common.cancel" });
   const compact = displayedRequest?.compact === true;
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -62,7 +77,8 @@ export function ConfirmDialogHost() {
   }, [settleConfirmation]);
 
   useEffect(() => {
-    if (!open) {
+    // YOLO 确认必须先勾选风险说明，不能被全局 Enter 直接确认。
+    if (!open || isYoloConfirmation) {
       return;
     }
 
@@ -89,7 +105,89 @@ export function ConfirmDialogHost() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [open, settleConfirmation, displayedRequest]);
+  }, [open, isYoloConfirmation, settleConfirmation, displayedRequest]);
+
+  if (isYoloConfirmation) {
+    return (
+      <AlertDialog open={open} onOpenChange={handleOpenChange}>
+        <AlertDialogContent
+          data-testid="yolo-confirmation-dialog"
+          className="max-h-[calc(100dvh-2rem)] gap-4 overflow-y-auto bg-popover p-4 shadow-md sm:p-5"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            cancelRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader className="gap-2">
+            <AlertDialogTitle className="flex items-center gap-3">
+              <TriangleAlertIcon className="size-5 shrink-0" aria-hidden="true" />
+              {displayedRequest?.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-relaxed sm:leading-6">
+              {intl.formatMessage({ id: "mode.yoloConfirmation.description" })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="divide-y divide-border rounded-xl bg-surface px-3">
+            {(
+              [
+                ["files", FolderIcon, "text-icon-blue"],
+                ["commands", SquareTerminalIcon, "text-foreground-subtle"],
+                ["network", GlobeIcon, "text-icon-blue"],
+              ] as const
+            ).map(([category, Icon, iconColor]) => (
+              <li key={category} className="flex items-center gap-3 py-2">
+                <Icon className={cn("size-5 shrink-0", iconColor)} aria-hidden="true" />
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-ui-base font-semibold">
+                    {intl.formatMessage({ id: `mode.yoloConfirmation.${category}` })}
+                  </p>
+                  <p className="text-ui-base text-foreground-subtle sm:text-ui-sm">
+                    {intl.formatMessage({ id: `mode.yoloConfirmation.${category}.description` })}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-ui-base leading-relaxed text-foreground-subtle sm:text-ui-sm sm:leading-5">
+            {intl.formatMessage({ id: "mode.yoloConfirmation.risk" })}
+          </p>
+          <label className="flex cursor-pointer items-start gap-2 text-ui-base leading-relaxed text-foreground">
+            <Checkbox
+              data-testid="yolo-confirmation-risk"
+              className="mt-1"
+              checked={checkboxChecked}
+              onCheckedChange={(value) =>
+                setCheckboxSelection({ request: displayedRequest, checked: value === true })
+              }
+            />
+            <span>{intl.formatMessage({ id: "mode.yoloConfirmation.acknowledgement" })}</span>
+          </label>
+          <AlertDialogFooter className="grid grid-cols-2 gap-3 sm:flex sm:gap-2">
+            <AlertDialogCancel
+              ref={cancelRef}
+              variant="secondary"
+              size="lg"
+              className="h-auto min-h-11 whitespace-normal px-4 sm:h-9 sm:min-h-0 sm:whitespace-nowrap"
+              data-testid="yolo-confirmation-cancel"
+              onClick={() => settleConfirmation(false)}
+            >
+              {intl.formatMessage({ id: "common.cancel" })}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              size="lg"
+              className="h-auto min-h-11 whitespace-normal px-4 sm:h-9 sm:min-h-0 sm:whitespace-nowrap"
+              data-testid="yolo-confirmation-confirm"
+              disabled={!checkboxChecked}
+              onClick={handleConfirm}
+            >
+              {intl.formatMessage({ id: "mode.yoloConfirmation.confirm" })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -133,9 +231,7 @@ export function ConfirmDialogHost() {
           {displayedRequest?.checkbox ? (
             <label className="mr-auto flex min-w-0 items-center gap-2 text-ui-base text-foreground-subtle">
               <Checkbox
-                checked={
-                  checkboxSelection.request === displayedRequest && checkboxSelection.checked
-                }
+                checked={checkboxChecked}
                 onCheckedChange={(value) => {
                   setCheckboxSelection({ request: displayedRequest, checked: value === true });
                   displayedRequest.checkbox?.onCheckedChange(value === true);

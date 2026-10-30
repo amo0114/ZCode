@@ -8,6 +8,7 @@ import type { ConversationSnapshot } from "@zcode/shared/zcode-protocol-v4";
 import { PermissionDialog } from "@/PermissionDialog.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { V4InteractionDialogs } from "@/v4/V4InteractionDialogs.js";
+import { useConfirmDialogStore } from "@/store/confirmDialogStore.js";
 
 vi.mock("@/v4/V4ConversationContext.js", () => ({
   useV4Conversation: () => ({ sendCommand: vi.fn() }),
@@ -154,7 +155,7 @@ describe("PermissionDialog focus", () => {
     };
   }
 
-  it("完全访问为第三项，数字 5 只聚焦反馈，第三项按原 optionId 提交", () => {
+  it("完全访问为第三项，数字 5 只聚焦反馈，第三项确认 YOLO 后按原 optionId 提交", async () => {
     const { input, options, flush, onRespond, confirm } = renderPermission(true, true);
     expect(options).toHaveLength(4);
     expect(options[2]!.textContent).toContain("完全访问");
@@ -170,6 +171,14 @@ describe("PermissionDialog focus", () => {
     flush();
     expect(document.activeElement).toBe(options[2]);
     fireEvent.click(confirm);
+    // 从非 YOLO 切入完全访问必须先经风险确认，确认前不提交审批。
+    expect(useConfirmDialogStore.getState().pendingRequest?.presentation).toBe(
+      "yolo-confirmation",
+    );
+    expect(onRespond).not.toHaveBeenCalled();
+    await act(async () => {
+      useConfirmDialogStore.getState().settleConfirmation(true);
+    });
     expect(onRespond).toHaveBeenCalledWith(
       "request-focus",
       expect.objectContaining({ optionId: "fullAccess" }),

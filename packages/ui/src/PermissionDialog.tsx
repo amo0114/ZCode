@@ -58,6 +58,7 @@ import { isSaveWorkflowToolCall } from "@/lib/workflowToolNames.js";
 import { useZCodeStoreWithDefault } from "@/store/StoreProvider.js";
 import { DEFAULT_CODE_PREVIEW_SETTINGS } from "@/lib/codePreviewSettings.js";
 import { useZCodeIntl } from "./i18n/IntlProvider.js";
+import { useYoloModeConfirmation } from "@/hooks/useConfirmDialog.js";
 import { Info, LoaderIcon, WrenchIcon } from "lucide-react";
 
 const MCP_PERMISSION_TOOL_ICON = <WrenchIcon className="size-4 shrink-0 text-foreground-subtle" />;
@@ -450,9 +451,11 @@ export function PermissionDialog({
   isWebRemoteControl = false,
   responding = false,
   responseError,
+  permissionMode,
 }: {
   request: ZCodePermissionRequest;
   responding?: boolean;
+  permissionMode?: string;
   responseError?: string;
   /**
    * `content` 只在工作流确认窗的放行应答上出现：用户在窗里改过的设置（docs/dynamic-workflow/launch.md
@@ -473,6 +476,17 @@ export function PermissionDialog({
   isWebRemoteControl?: boolean;
 }) {
   const { intl } = useZCodeIntl();
+  const confirmMode = useYoloModeConfirmation(
+    JSON.stringify([
+      workspacePath,
+      workspaceIdentity,
+      remoteSessionId,
+      request.taskId,
+      request.requestId,
+      responding,
+    ]),
+    permissionMode,
+  );
   const isMobileTextInputViewport = useIsMobileTextInputViewport();
   // Bug 根因：反馈输入也会渲染在手机 Web 远控的 PermissionDialog 中，14px 输入框聚焦时会触发 iOS 页面放大。
   // 与 composer 复用同一套视口判断和 16px 兼容 token，桌面和非远控 Web 保持原有字号。
@@ -618,13 +632,16 @@ export function PermissionDialog({
         workflowSettingsContent !== undefined && isWorkflowSettingsCarrier(option)
           ? { ...workflowSettingsContent }
           : undefined;
-      if (content === undefined) {
-        onRespond(request.requestId, option, trimmedFeedback || undefined);
-      } else {
-        onRespond(request.requestId, option, trimmedFeedback || undefined, content);
-      }
+      confirmMode(option.optionId === "fullAccess" ? "yolo" : "unchanged", () => {
+        if (content === undefined) {
+          onRespond(request.requestId, option, trimmedFeedback || undefined);
+        } else {
+          onRespond(request.requestId, option, trimmedFeedback || undefined, content);
+        }
+      });
     },
     [
+      confirmMode,
       feedback,
       isOptionBlocked,
       onRespond,

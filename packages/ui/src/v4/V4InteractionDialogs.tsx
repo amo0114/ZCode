@@ -340,6 +340,7 @@ export function V4InteractionDialogs({
         {...(workflowSessionModel === undefined ? {} : { workflowSessionModel })}
         isWebRemoteControl={isWebRemoteControl}
         provider={provider}
+        permissionMode={currentSnapshot?.config?.mode}
         responding={
           permissionResponse?.interactionId === pending.interactionId && permissionResponse.pending
         }

@@ -26,6 +26,8 @@ import {
   resolveModeOptionIcon,
 } from "@/chat-input-toolbar/display.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import { useYoloModeConfirmation } from "@/hooks/useConfirmDialog.js";
+import { useConfirmDialogStore } from "@/store/confirmDialogStore.js";
 import { isCoarseTouchDevice } from "@/lib/pickerFocus.js";
 import { useShortcutCommandLabel } from "@/shortcuts/useShortcutBindings.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
@@ -57,6 +59,14 @@ function V4ComposerModeSwitchImpl({
   | "onSwitchMode"
 >) {
   const { intl } = useZCodeIntl();
+  // 原草稿回调随 scope 换代，旧确认不能把权限写入后来选中的任务。
+  const confirmMode = useYoloModeConfirmation(disabled ? null : onSwitchMode, draftConfig?.mode);
+  const requestSwitchMode = useCallback(
+    (mode: string) => {
+      confirmMode(mode, () => onSwitchMode(mode));
+    },
+    [confirmMode, onSwitchMode],
+  );
   const displayProvider = provider ?? ZCODE_AGENT_PROVIDER;
   const modeShortcutLabel = useShortcutCommandLabel("cycleSessionMode");
   const modes = getZCodeAgentAvailableModes();
@@ -86,8 +96,8 @@ function V4ComposerModeSwitchImpl({
   );
   const cycle = useCallback(() => {
     const next = getNextConfigSelectValue(modeOption);
-    if (next) onSwitchMode(next);
-  }, [modeOption, onSwitchMode]);
+    if (next) requestSwitchMode(next);
+  }, [modeOption, requestSwitchMode]);
   useToolbarShortcutBindings({
     hasAnyOption: Boolean(selected),
     toolbarDisabled: disabled,
@@ -139,7 +149,7 @@ function V4ComposerModeSwitchImpl({
           className="w-64"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            if (!isCoarseTouchDevice())
+            if (!useConfirmDialogStore.getState().pendingRequest && !isCoarseTouchDevice())
               document
                 .querySelector<HTMLElement>(`[data-testid="${TID_V4_COMPOSER_INPUT}"]`)
                 ?.focus();
@@ -162,7 +172,7 @@ function V4ComposerModeSwitchImpl({
             </span>
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
-          <DropdownMenuRadioGroup value={selected.id} onValueChange={onSwitchMode}>
+          <DropdownMenuRadioGroup value={selected.id} onValueChange={requestSwitchMode}>
             {permissions.map((mode) => {
               const ModeIcon = resolveModeOptionIcon(mode.id);
               const descriptionId = getModeOptionDescriptionMessageId(displayProvider, {

@@ -5618,6 +5618,22 @@ const enUS: Record<string, string> = {
   "planTool.panel.expand": "Expand plan",
   "planTool.panel.collapse": "Collapse plan",
   "planTool.panel.copy": "Copy plan",
+  "mode.yoloConfirmation.title": "Enable full access?",
+  "mode.yoloConfirmation.description":
+    "Tasks can perform the following actions without asking for your approval each time.",
+  "mode.yoloConfirmation.files": "Files and folders",
+  "mode.yoloConfirmation.files.description": "Read, create, change, and delete accessible files.",
+  "mode.yoloConfirmation.commands": "Terminal commands",
+  "mode.yoloConfirmation.commands.description":
+    "Run commands, install software, or change system settings.",
+  "mode.yoloConfirmation.network": "Network and apps",
+  "mode.yoloConfirmation.network.description":
+    "Access the network, send data, and use connected apps.",
+  "mode.yoloConfirmation.risk":
+    "These actions may cause data loss or disclosure. Enable only for tasks you trust. You can switch to another permission mode at any time.",
+  "mode.yoloConfirmation.acknowledgement":
+    "I understand the risks and take responsibility for my data security.",
+  "mode.yoloConfirmation.confirm": "Confirm",
   "planTool.panel.copied": "Plan copied",
   "planTool.panel.open": "Open plan in side pane",
   "planTool.panel.viewFull": "View full plan",
