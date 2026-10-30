@@ -2272,6 +2272,8 @@ const enUS: Record<string, string> = {
   "taskNav.noMoreForward": "No next tasks",
   "taskList.switchBlockedByModelRestart":
     "Model provider switch in progress. Task switching is temporarily disabled.",
+  "chat.message.link.openInZCode": "Open in ZCode",
+  "chat.previewCards.copyLink": "Copy link",
   "sidebar.exportLogs": "Export logs",
   "sidebar.exportLogs.pending": "Exporting logs...",
   "sidebar.exportLogs.error": "Failed to export logs: {error}",

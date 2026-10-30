@@ -2138,6 +2138,8 @@ const zhCN: Record<string, string> = {
   "taskNav.noMoreForward": "没有更新的任务了",
   "taskList.switchBlockedByModelRestart": "模型供应商切换中，暂时不能切换任务。",
   "sidebar.exportLogs": "下载日志",
+  "chat.message.link.openInZCode": "在 ZCode 中打开",
+  "chat.previewCards.copyLink": "复制链接",
   "sidebar.exportLogs.pending": "正在导出日志中",
   "sidebar.exportLogs.error": "导出日志失败：{error}",
   "sidebar.newTask": "新建任务",
