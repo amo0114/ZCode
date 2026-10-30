@@ -5,7 +5,7 @@ import {
   DesktopCommandIds,
   desktopMenuMessageIds,
   getDesktopMenuMessage,
-  ZCODE_PRODUCT_FLAVOR,
+  ZCODE_UPDATER_AVAILABLE,
   type DesktopCommandId,
   type Locale,
 } from "@zcode/shared";
@@ -99,8 +99,8 @@ export function createDesktopTray(options: {
           click: () => executeTrayCommand(DesktopCommandIds.OpenWorkspace),
         },
         { type: "separator" },
-        // 更新入口跟随产品身份：Preview（含生产后端的 Preview）禁用更新器，托盘也不能露出入口。
-        ...(ZCODE_PRODUCT_FLAVOR === "production"
+        // 更新入口跟随更新器可用性：未配置自建更新源的 Preview 禁用更新器，托盘也不能露出入口。
+        ...(ZCODE_UPDATER_AVAILABLE
           ? [
               {
                 label: getLabel(desktopMenuMessageIds.helpCheckForUpdates),

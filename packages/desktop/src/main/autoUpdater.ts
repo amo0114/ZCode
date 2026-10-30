@@ -10,6 +10,7 @@ import {
   TEST_ZCODE_ENDPOINT_ORIGIN,
   PlatformChannels,
   ZCODE_VERSION,
+  ZCODE_UPDATE_MANIFEST_URL,
   desktopMenuMessageIds,
   formatDesktopMenuMessage,
   getDesktopMenuMessage,
@@ -835,8 +836,10 @@ async function syncAutoUpdateCheckChannelFromSettings(
 }
 
 function applyManifestUpdateProvider(options: InitAutoUpdaterOptions): void {
-  // 在更新器装配边界再次约束，避免内部调用绕过启动配置解析。
-  const manifestUrl = app.isPackaged ? undefined : options.updateFeedSource?.url.trim();
+  // 在更新器装配边界再次约束，避免内部调用绕过启动配置解析：正式包只认构建期注入的自建更新源，
+  // 启动参数/环境变量的调试更新源仅限未打包运行。
+  const debugManifestUrl = app.isPackaged ? undefined : options.updateFeedSource?.url.trim();
+  const manifestUrl = debugManifestUrl || ZCODE_UPDATE_MANIFEST_URL || undefined;
   autoUpdater.setFeedURL({
     provider: "custom",
     updateProvider: ManifestUpdateProvider,

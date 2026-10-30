@@ -13,7 +13,7 @@ import {
   resolveHelpAppConfig,
   resolveZCodeEndpointOrigin,
   ZCODE_ENV,
-  ZCODE_PRODUCT_FLAVOR,
+  ZCODE_UPDATER_AVAILABLE,
   type AppSettings,
   type DesktopCommandId,
   type Locale,
@@ -573,8 +573,8 @@ export async function executeDesktopCommand(options: {
       );
       return;
     case DesktopCommandIds.CheckForUpdates:
-      // 按产品身份而不是后端环境放行：生产后端的 Preview 同样没有更新器。
-      if (ZCODE_PRODUCT_FLAVOR === "production") {
+      // 按更新器可用性而不是后端环境放行：未配置自建更新源的 Preview 没有更新器。
+      if (ZCODE_UPDATER_AVAILABLE) {
         checkForUpdateMenuClick(targetWindow);
       } else {
         options.logger.info("[auto-update] Preview 已禁用手动更新检查");

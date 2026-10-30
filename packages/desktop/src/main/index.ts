@@ -79,6 +79,8 @@ import {
   ZCODE_ENV,
   ZCODE_PRODUCT_FLAVOR,
   ZCODE_AUTO_UPDATE_ENABLED,
+  ZCODE_UPDATE_MANIFEST_URL,
+  ZCODE_UPDATER_AVAILABLE,
   DEFAULT_ZCODE_ENDPOINT_ORIGIN,
   DEFAULT_LOCALE,
   TEST_ZCODE_ENDPOINT_ORIGIN,
@@ -2265,7 +2267,7 @@ app.whenReady().then(async () => {
   // 不向 Preview 渠道提供更新。构建期未启用自动更新时同样不更新
   // （见 docs/desktop/build-time-optional-capabilities.md）。
   void initAutoUpdater({
-    enabled: ZCODE_PRODUCT_FLAVOR === "production" && ZCODE_AUTO_UPDATE_ENABLED,
+    enabled: ZCODE_UPDATER_AVAILABLE && ZCODE_AUTO_UPDATE_ENABLED,
     onBeforeQuitAndInstall: async () => {
       notifyStabilityLifecycle("update_install");
       await prepareAppQuit("auto-update quitAndInstall", "update-install");
@@ -2578,11 +2580,12 @@ app.whenReady().then(async () => {
   // 是面向打包发布客户端的安全门，对未打包 dev 运行时无意义。打包版 app.isPackaged === true，
   // gate 照常生效，对真实用户零影响。
   const skipForceUpdateForLocalDevRuntime = !app.isPackaged;
-  // 强制升级只能经官方更新渠道解除；构建期未启用自动更新（自建/开源构建）时，官方的
+  // 强制升级只能经官方更新渠道解除；构建期未启用自动更新或改用自建更新源时，官方的
   // minimalVersion 与本构建无关，命中后只会让客户端启动即退出且无法升级。
   const forceUpdateGuardResult =
     ZCODE_PRODUCT_FLAVOR === "production" &&
     ZCODE_AUTO_UPDATE_ENABLED &&
+    !ZCODE_UPDATE_MANIFEST_URL &&
     !skipForceUpdateForLocalDevRuntime
       ? await maybeBlockStartupForForceUpdate({
           locale: currentApplicationLocale,
@@ -2597,6 +2600,8 @@ app.whenReady().then(async () => {
     logger.info("[force-update] Preview 跳过远端强制升级检查");
   } else if (!ZCODE_AUTO_UPDATE_ENABLED) {
     logger.info("[force-update] 构建期未启用自动更新，跳过远端强制升级检查");
+  } else if (ZCODE_UPDATE_MANIFEST_URL) {
+    logger.info("[force-update] 使用自建更新源，跳过官方远端强制升级检查");
   } else if (skipForceUpdateForLocalDevRuntime) {
     logger.info("[force-update] 本地 dev 构建（未打包）跳过远端强制升级检查");
   }

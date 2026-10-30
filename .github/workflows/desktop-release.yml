@@ -1,8 +1,8 @@
 name: Desktop Release
 
 # 推送 desktop-v* tag 时在 GitHub 托管的 Windows 机器上打 NSIS 安装包，并上传到同名 GitHub Release。
-# 不设置 ZCODE_AUTO_UPDATE：安装包既不连官方更新渠道，也不执行官方强制升级检查
-# （见 docs/desktop/build-time-optional-capabilities.md）。
+# 自动更新只走自建更新源：安装包从 R2 上的 latest.yml 检查更新，不连官方更新渠道，
+# 也不执行官方强制升级检查（见 docs/desktop/build-time-optional-capabilities.md）。
 on:
   push:
     tags: ["desktop-v*"]
@@ -16,6 +16,8 @@ env:
   CDN_DOMAIN: zcode-assets.deadloop.kdns.fr
   OSS_PATH_PREFIX: releases
   R2_BUCKET: zcode-remote-assets
+  # 桌面自动更新源：electron-builder 生成的 latest.yml 与安装包放在同一目录。
+  UPDATE_PATH_PREFIX: desktop/win
 
 jobs:
   remote-assets:
@@ -75,6 +77,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       # 不向这一步提供 GH_TOKEN：electron-builder 检测到 token 时可能自行发布到 GitHub。
       - name: Bundle Windows installer
+        env:
+          ZCODE_AUTO_UPDATE: "1"
+          ZCODE_UPDATE_MANIFEST_URL: https://${{ env.CDN_DOMAIN }}/${{ env.UPDATE_PATH_PREFIX }}/latest.yml
         run: pnpm bundle:desktop -- --os win --arch x64
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -99,3 +104,33 @@ jobs:
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
           fi
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+      - name: Publish update feed to R2
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dist=packages/desktop/dist
+          if [ ! -f "$dist/latest.yml" ]; then
+            echo "electron-builder did not produce latest.yml" >&2
+            exit 1
+          fi
+          # 先传安装包与差分 blockmap，最后传 latest.yml，避免客户端读到引用缺失安装包的 manifest。
+          for file in "$dist"/*.exe "$dist"/*.exe.blockmap; do
+            aws s3 cp "$file" "s3://$R2_BUCKET/$UPDATE_PATH_PREFIX/$(basename "$file")" \
+              --endpoint-url "$R2_ENDPOINT"
+          done
+          # latest.yml 中的相对 url 由客户端按同目录解析；发布前逐个确认可下载，避免文件名不一致导致更新 404。
+          sed -n 's/^ *- url: *//p' "$dist/latest.yml" | while read -r name; do
+            encoded=$(node -e 'process.stdout.write(encodeURI(process.argv[1]))' "$name")
+            curl -fsSI -o /dev/null "https://$CDN_DOMAIN/$UPDATE_PATH_PREFIX/$encoded"
+          done
+          aws s3 cp "$dist/latest.yml" "s3://$R2_BUCKET/$UPDATE_PATH_PREFIX/latest.yml" \
+            --content-type "text/yaml" --cache-control "no-cache" --endpoint-url "$R2_ENDPOINT"
+          curl -fsS -o /dev/null "https://$CDN_DOMAIN/$UPDATE_PATH_PREFIX/latest.yml"

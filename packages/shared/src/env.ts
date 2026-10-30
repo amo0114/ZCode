@@ -11,6 +11,7 @@ declare const __ZCODE_PRODUCT_FLAVOR__: string;
 declare const __ZCODE_ARMS_RUM_ENDPOINT__: string;
 declare const __ZCODE_TELEMETRY_REPORT_ENDPOINT__: string;
 declare const __ZCODE_AUTO_UPDATE_ENABLED__: boolean;
+declare const __ZCODE_UPDATE_MANIFEST_URL__: string;
 
 export function normalizeZCodeEnv(value: string | undefined): ZCodeEnv {
   return value?.trim().toLowerCase() === "production" ? "production" : "test";
@@ -60,6 +61,12 @@ export const ZCODE_TELEMETRY_REPORT_ENDPOINT: string =
 /** 桌面自动更新是否启用。 */
 export const ZCODE_AUTO_UPDATE_ENABLED: boolean =
   typeof __ZCODE_AUTO_UPDATE_ENABLED__ !== "undefined" ? __ZCODE_AUTO_UPDATE_ENABLED__ : false;
+/** 自建更新源的 manifest 地址；为空时沿用官方更新渠道。 */
+export const ZCODE_UPDATE_MANIFEST_URL: string =
+  typeof __ZCODE_UPDATE_MANIFEST_URL__ !== "undefined" ? __ZCODE_UPDATE_MANIFEST_URL__ : "";
+/** 更新器入口是否开放：官方 production 形态，或配置了自建更新源（自建构建通常是 Preview 形态）。 */
+export const ZCODE_UPDATER_AVAILABLE: boolean =
+  ZCODE_PRODUCT_FLAVOR === "production" || ZCODE_UPDATE_MANIFEST_URL !== "";
 
 /** 将本地运行态与编译期 ZCODE_ENV 映射为 ARMS 控制台识别的上报环境标签 */
 export function mapZCodeEnvToArmsRumEnv(runtimeEnv: ZCodeRuntimeEnv): ArmsRumEnv {

@@ -212,7 +212,8 @@ export class ManifestUpdateProvider extends Provider<UpdateInfo> {
       deviceMid: this.options.deviceMid,
       channel: releaseChannel,
     });
-    this.resolveBaseUrl = new URL("/", manifestUrl);
+    // 相对路径按 manifest 所在目录解析，与 electron-builder 生成的 latest.yml（url 为同目录文件名）一致。
+    this.resolveBaseUrl = new URL(".", manifestUrl);
     const releaseChannelApiValue = mapReleaseChannelToApiValue(releaseChannel);
 
     const raw = await this.httpRequest(manifestUrl, {
