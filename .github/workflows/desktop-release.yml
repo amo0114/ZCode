@@ -10,7 +10,7 @@ on:
 permissions:
   contents: write
 
-# SSH/WSL/Docker 远端运行时（manifest + components）自托管在 Cloudflare R2，不使用官方 CDN。
+# SSH/WSL/Docker 远端运行时（source-server-release.json + 各平台整包）自托管在 Cloudflare R2，不使用官方 CDN。
 # 安装包在构建期把 https://$CDN_DOMAIN/$OSS_PATH_PREFIX 注入为远端资源下载根（见 packages/desktop/tsup.config.ts）。
 env:
   CDN_DOMAIN: zcode-assets.deadloop.kdns.fr
@@ -46,14 +46,16 @@ jobs:
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
-          mock_cdn=packages/desktop/mock-cdn
-          # 组件按内容哈希命名、跨版本共用；先传组件再传 manifest，避免客户端读到引用缺失组件的 manifest。
-          aws s3 cp "$mock_cdn/components" "s3://$R2_BUCKET/$OSS_PATH_PREFIX/components" \
-            --recursive --endpoint-url "$R2_ENDPOINT"
-          aws s3 cp "$mock_cdn/releases/$version" "s3://$R2_BUCKET/$OSS_PATH_PREFIX/$version" \
-            --recursive --exclude "*" --include "manifest-*.json" \
-            --content-type application/json --endpoint-url "$R2_ENDPOINT"
-          curl -fsS -o /dev/null "https://$CDN_DOMAIN/$OSS_PATH_PREFIX/$version/manifest-linux-x64.json"
+          release_dir=packages/desktop/mock-cdn/releases/$version
+          # 客户端先读 source-server-release.json，再按其中的相对 url 下载同目录的整包；
+          # 先传整包再传描述文件，避免客户端读到引用缺失整包的描述文件。
+          aws s3 cp "$release_dir" "s3://$R2_BUCKET/$OSS_PATH_PREFIX/$version" \
+            --recursive --exclude "*" --include "*.tar.gz" --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "$release_dir/source-server-release.json" \
+            "s3://$R2_BUCKET/$OSS_PATH_PREFIX/$version/source-server-release.json" \
+            --content-type application/json --cache-control "no-cache" --endpoint-url "$R2_ENDPOINT"
+          curl -fsS -o /dev/null "https://$CDN_DOMAIN/$OSS_PATH_PREFIX/$version/source-server-release.json"
+          curl -fsSI -o /dev/null "https://$CDN_DOMAIN/$OSS_PATH_PREFIX/$version/zcode-server-linux-x64.tar.gz"
 
   windows:
     needs: remote-assets
