@@ -54,10 +54,6 @@ export function resolveRemoteCdnBaseUrls(options: ResolveRemoteCdnOptions = {}):
     : [REMOTE_CDN_RELEASE_ROOTS.overseas, REMOTE_CDN_RELEASE_ROOTS.domestic];
   const version = options.version ?? ZCODE_VERSION;
 
-  if (options.env === "test") {
-    return [`${TEST_REMOTE_CDN_RELEASE_ROOT}/${version}`];
-  }
-
   const configuredReleaseRoots =
     typeof __ZCODE_REMOTE_CDN_RELEASE_ROOTS__ === "undefined"
       ? []
@@ -65,9 +61,14 @@ export function resolveRemoteCdnBaseUrls(options: ResolveRemoteCdnOptions = {}):
   if (configuredReleaseRoots.length > 0) {
     // Bugfix：remote runtime 的 manifest/components 下载根不能继续写死旧 CDN。
     // 构建期按 CI 的 CDN_DOMAIN/OSS_PATH_PREFIX 注入有序列表，切换时只改 CI 变量。
+    // 测试环境同样优先使用注入值：自托管构建没有内网 remote assets 根目录。
     return configuredReleaseRoots.map(
       (releaseRoot) => `${normalizeBaseUrl(releaseRoot)}/${version}`,
     );
+  }
+
+  if (options.env === "test") {
+    return [`${TEST_REMOTE_CDN_RELEASE_ROOT}/${version}`];
   }
 
   return orderedReleaseRoots.map((releaseRoot) => `${releaseRoot}/${version}`);

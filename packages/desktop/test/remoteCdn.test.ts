@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   isUtcPlusEightTimeZone,
   resolveRemoteCdnBaseUrls,
@@ -6,6 +6,10 @@ import {
 } from "../src/main/remoteCdn.js";
 
 describe("remoteCdn", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("中文且东八区时应优先国内 CDN", () => {
     expect(
       shouldPreferDomesticRemoteCdn({
@@ -69,6 +73,16 @@ describe("remoteCdn", () => {
     ).toEqual([
       "http://intranet.example.invalid:12345/ssh-remote-assets/0.0.0-test",
     ]);
+  });
+
+  it("测试产品环境构建期注入下载根时应优先使用注入值", () => {
+    vi.stubGlobal("__ZCODE_REMOTE_CDN_RELEASE_ROOTS__", ["https://assets.example.com/releases/"]);
+    expect(
+      resolveRemoteCdnBaseUrls({
+        env: "test",
+        version: "0.0.0-test",
+      }),
+    ).toEqual(["https://assets.example.com/releases/0.0.0-test"]);
   });
 
   it("显式覆盖 CDN 基址时不再按产品环境选择默认值", () => {

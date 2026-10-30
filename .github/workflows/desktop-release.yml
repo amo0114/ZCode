@@ -10,12 +10,57 @@ on:
 permissions:
   contents: write
 
+# SSH/WSL/Docker 远端运行时（manifest + components）自托管在 Cloudflare R2，不使用官方 CDN。
+# 安装包在构建期把 https://$CDN_DOMAIN/$OSS_PATH_PREFIX 注入为远端资源下载根（见 packages/desktop/tsup.config.ts）。
+env:
+  CDN_DOMAIN: zcode-assets.deadloop.kdns.fr
+  OSS_PATH_PREFIX: releases
+  R2_BUCKET: zcode-remote-assets
+
 jobs:
+  remote-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build remote assets
+        run: pnpm prepare:remote-assets
+      - name: Upload remote assets to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # R2 不支持 AWS CLI 新版默认附加的部分校验和头。
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          mock_cdn=packages/desktop/mock-cdn
+          # 组件按内容哈希命名、跨版本共用；先传组件再传 manifest，避免客户端读到引用缺失组件的 manifest。
+          aws s3 cp "$mock_cdn/components" "s3://$R2_BUCKET/$OSS_PATH_PREFIX/components" \
+            --recursive --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "$mock_cdn/releases/$version" "s3://$R2_BUCKET/$OSS_PATH_PREFIX/$version" \
+            --recursive --exclude "*" --include "manifest-*.json" \
+            --content-type application/json --endpoint-url "$R2_ENDPOINT"
+          curl -fsS -o /dev/null "https://$CDN_DOMAIN/$OSS_PATH_PREFIX/$version/manifest-linux-x64.json"
+
   windows:
+    needs: remote-assets
     runs-on: windows-latest
     timeout-minutes: 150
     env:
       NODE_OPTIONS: --max-old-space-size=8192
+      # 远端资源已由 remote-assets job 构建并上传，安装包本身不依赖 mock-cdn。
+      ZCODE_SKIP_REMOTE_ASSETS: "1"
     steps:
       # 仓库测试树路径较深，Windows 默认 260 字符上限会让 checkout 失败。
       - name: Enable long paths
