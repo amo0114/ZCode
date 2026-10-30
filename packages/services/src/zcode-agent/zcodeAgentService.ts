@@ -3261,7 +3261,6 @@ export function createZCodeAgentService(
     if (envelope.type === "createSession") {
       const { dynamicWorkflowEnabled, dynamicWorkflowMode } =
         await resolveDynamicWorkflowSessionFlags();
-      if (!dynamicWorkflowEnabled) return envelope;
       const payload = commandPayloadSchemas.createSession.parse(envelope.payload);
       if (params.projectId !== undefined && !options?.prepareSessionCreation)
         throw new Error("project.creation-unavailable");
