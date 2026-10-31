@@ -1,0 +1,7 @@
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 品牌占位标记：不绑定任何产品名，定名后整体替换本文件即可。
+       去掉字母字形是品牌剥离的一部分，避免界面继续出现旧品牌标志。 -->
+  <rect x="1" y="1" width="16" height="16" rx="4.5" fill="currentColor" fill-opacity="0.14" />
+  <rect x="1" y="1" width="16" height="16" rx="4.5" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.2" />
+  <circle cx="9" cy="9" r="2.6" fill="currentColor" />
+</svg>

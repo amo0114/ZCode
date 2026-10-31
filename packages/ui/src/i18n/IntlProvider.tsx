@@ -1,9 +1,21 @@
-import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import type { ReactNode } from "react";
 import type { Locale, LocalePreference } from "@zcode/shared";
-import { DEFAULT_LOCALE } from "@zcode/shared";
+import { DEFAULT_LOCALE, PRODUCT_NAME } from "@zcode/shared";
 import type { BroadcastMessage, IBroadcastService, ISettingService } from "@zcode/services";
-import { readNavigatorLanguage, readSafeLocalStorage, writeSafeLocalStorage } from "@/lib/browserEnvironment.js";
+import {
+  readNavigatorLanguage,
+  readSafeLocalStorage,
+  writeSafeLocalStorage,
+} from "@/lib/browserEnvironment.js";
 import zhCN from "./locales/zh-CN.js";
 import enUS from "./locales/en-US.js";
 
@@ -107,10 +119,11 @@ function createIntl(locale: Locale): IntlInstance {
   return {
     formatMessage({ id }, values) {
       let msg = messages[id] ?? id;
-      if (values) {
-        for (const [key, val] of Object.entries(values)) {
-          msg = msg.replaceAll(`{${key}}`, String(val));
-        }
+      // 品牌名由词条表的 {product} 占位，调用点不需要逐个传参。
+      // 调用方显式传入同名 key 时以调用方为准，保持既有覆盖语义。
+      const resolved = { product: PRODUCT_NAME, ...values };
+      for (const [key, val] of Object.entries(resolved)) {
+        msg = msg.replaceAll(`{${key}}`, String(val));
       }
       return msg;
     },

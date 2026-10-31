@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import {
   conversationShareErrorEnvelopeSchema,
   classifyConversationShareError,
@@ -238,7 +239,7 @@ export class ConversationSharePreviewClient {
       });
       throw new ConversationSharePreviewClientError({
         kind: "unsupported_schema_version",
-        message: "Conversation share requires a newer ZCode version",
+        message: `Conversation share requires a newer ${PRODUCT_NAME} version`,
         status: response.status,
         requestId,
       });

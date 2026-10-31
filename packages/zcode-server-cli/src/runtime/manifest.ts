@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import { platform, arch } from "node:process";
 import { SERVER_RUNTIME_NODE_VERSION } from "../contracts.js";
 import { z } from "zod";
@@ -60,7 +61,7 @@ export const serverRuntimeManifestSchema = z
 export function currentServerTarget(): ServerTarget {
   const target = `${platform}-${arch}`;
   if (!supportedServerTargets.includes(target as ServerTarget)) {
-    throw new Error(`Unsupported ZCode Server target: ${target}`);
+    throw new Error(`Unsupported ${PRODUCT_NAME} Server target: ${target}`);
   }
   return target as ServerTarget;
 }

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import { access } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { stablePathId, type ServerLayout } from "../runtime/paths.js";
@@ -67,7 +68,7 @@ export function createServiceDescriptor(options: {
     return {
       kind: "systemd",
       name,
-      content: `[Unit]\nDescription=ZCode Server\n[Service]\nExecStart=${shellQuote(options.command)} ${args.map(shellQuote).join(" ")}\nRestart=on-failure\n[Install]\nWantedBy=default.target\n`,
+      content: `[Unit]\nDescription=${PRODUCT_NAME} Server\n[Service]\nExecStart=${shellQuote(options.command)} ${args.map(shellQuote).join(" ")}\nRestart=on-failure\n[Install]\nWantedBy=default.target\n`,
     };
   }
   return {

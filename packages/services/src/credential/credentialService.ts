@@ -7,6 +7,7 @@ import {
   credentialValueSchema,
   formatZodError,
   isCredentialDecryptError,
+  PRODUCT_NAME,
 } from "@zcode/shared";
 import type { ICredentialService } from "./credential.js";
 import {
@@ -69,7 +70,9 @@ async function readAll(credentialsFile = getCredentialsFile()): Promise<Record<s
       backupPath,
       credentialsFile,
     });
-    throw new Error(`ZCode credentials are corrupt: ${credentialsFile}`, { cause: error });
+    throw new Error(`${PRODUCT_NAME} credentials are corrupt: ${credentialsFile}`, {
+      cause: error,
+    });
   }
 }
 

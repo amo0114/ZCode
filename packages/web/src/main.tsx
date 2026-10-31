@@ -3,6 +3,7 @@ import {
 } from "#src/platform/index.js";
 import {
   matchesWebRemoteControlRoutePath,
+  PRODUCT_NAME,
 } from "@zcode/shared";
 /* eslint-disable max-lines -- Web 远程控制启动、错误页和 web 平台桥接暂时集中在入口编排。 */
 import {
@@ -124,7 +125,8 @@ async function renderConversationSharePage(): Promise<void> {
   document.documentElement.lang = routeLocale;
   // 分享页必须设置 title：否则浏览器标签只显示 index.html 的通用标题。
   // 会话标题要等 preview 加载完，先给一个语言正确的兜底。
-  document.title = routeLocale === "zh-CN" ? "ZCode 会话分享" : "ZCode Conversation Share";
+  document.title =
+    routeLocale === "zh-CN" ? `${PRODUCT_NAME} 会话分享` : `${PRODUCT_NAME} Conversation Share`;
   const shareCode = resolveConversationShareCodeFromPath(window.location.pathname);
   if (!shareCode) {
     root.render(
@@ -389,7 +391,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
       initialize: async (params: { workspacePath: string; workspaceIdentity?: string }) => ({
         available: false,
         workspaceKey: params.workspaceIdentity?.trim() || params.workspacePath,
-        reason: "ZCode agent service is not available before workspace bridge is connected.",
+        reason: `${PRODUCT_NAME} agent service is not available before workspace bridge is connected.`,
       }),
       disposeAll: () => {},
     }),
@@ -400,7 +402,7 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
       }) => ({
         available: false,
         workspaceKey: params.workspaceIdentity?.trim() || params.workspacePath,
-        reason: "ZCode session service is not available before workspace bridge is connected.",
+        reason: `${PRODUCT_NAME} session service is not available before workspace bridge is connected.`,
       }),
     }),
     // 分享发布首期只属于 desktop local host；Web 首页和 /remote 不建立独立发布权威。
@@ -548,7 +550,7 @@ async function bootstrapWebApp() {
       onClose: () => {},
     });
     const platform = createWebPlatform();
-    document.title = "ZCode - Web + Server";
+    document.title = `${PRODUCT_NAME} - Web + Server`;
 
     root.render(
       <AppErrorBoundary>

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -61,7 +62,7 @@ export async function prepareOnlineUpdate(layout: ServerLayout): Promise<UpdateP
     const pending = await new ReleaseManager(layout).readPending();
     if (!pending) {
       throw new Error(
-        "ZCode Server release source is not configured and no offline pending release is available",
+        `${PRODUCT_NAME} Server release source is not configured and no offline pending release is available`,
       );
     }
     return { status: "prepared-offline", version: pending.version };

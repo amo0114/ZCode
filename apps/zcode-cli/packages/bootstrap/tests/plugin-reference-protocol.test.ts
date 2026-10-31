@@ -5,6 +5,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PRODUCT_NAME } from "@zcode/shared";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 // 与 plugins-protocol.test.ts 同因：协议 handler 的 user config 解析必须与真实 HOME 隔离。
@@ -176,8 +177,8 @@ describe("plugins/referenceCatalog protocol", () => {
         result.plugins.map((x) => x.pluginId),
       );
       expect(() => zcodePluginsReferenceCatalogResultSchema.parse(enriched)).not.toThrow();
-      expect(zcodeGuide?.displayName).toBe("ZCode Guide");
-      expect(zcodeGuide?.displayNameI18n?.["zh-CN"]).toBe("ZCode 使用指南");
+      expect(zcodeGuide?.displayName).toBe(`${PRODUCT_NAME} Guide`);
+      expect(zcodeGuide?.displayNameI18n?.["zh-CN"]).toBe(`${PRODUCT_NAME} 使用指南`);
       expect(zcodeGuide?.description).toEqual(expect.any(String));
       expect(zcodeGuide?.descriptionI18n?.["zh-CN"]).toEqual(expect.any(String));
       expect(

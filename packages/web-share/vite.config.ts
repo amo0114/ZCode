@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { PRODUCT_NAME } from "../shared/src/productBrand.js";
+import { createProductBrandHtmlPlugin } from "../../scripts/product-brand-html-plugin.mjs";
 import { resolveRuntimeZCodeEndpointOrigin } from "../shared/src/zcodeEndpoint.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -22,7 +24,7 @@ export default defineConfig(({ mode }) => {
     // Share 复用 Web 的 material-icons 素材，但不复制完整 Web 源码/依赖。
     // 这样 dev:web-share 与 Docker 生产构建都从同一份 public 资源读取图标。
     publicDir: resolve(REPO_ROOT, "packages/web/public"),
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), createProductBrandHtmlPlugin(PRODUCT_NAME)],
     resolve: {
       alias: [
         { find: "@", replacement: resolve(REPO_ROOT, "packages/ui/src") },

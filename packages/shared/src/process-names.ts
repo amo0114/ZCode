@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "./productBrand.js";
+
 const ZCODE_PROCESS_PREFIX = "zcode";
 const MAX_PROCESS_NAME_SEGMENT_LENGTH = 24;
 
@@ -49,7 +51,9 @@ export function formatZCodeHostProcessName(label?: string): string {
 
 export function formatZCodeRendererProcessName(windowTitle?: string): string {
   const normalizedTitle = windowTitle?.trim();
-  if (!normalizedTitle || normalizedTitle === "ZCode") {
+  // 主窗口标题是 `${PRODUCT_NAME} / <workspace>`，这里按同一产品名前缀归一，
+  // 否则品牌改名后主窗口会被当成独立 page，资源管理器里显示成 renderer-<标题>。
+  if (!normalizedTitle || normalizedTitle === PRODUCT_NAME) {
     return joinZCodeProcessName("renderer", "main");
   }
 
@@ -57,7 +61,7 @@ export function formatZCodeRendererProcessName(windowTitle?: string): string {
     return joinZCodeProcessName("renderer", "resource-manager");
   }
 
-  const remoteWindowPrefix = "ZCode - ";
+  const remoteWindowPrefix = `${PRODUCT_NAME} - `;
   if (normalizedTitle.startsWith(remoteWindowPrefix)) {
     return joinZCodeProcessName(
       "renderer",

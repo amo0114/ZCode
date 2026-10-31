@@ -234,7 +234,7 @@ Slash Commands:
     },
     terminal: {
       requiresInteractive: "TUI requires an interactive terminal.",
-      starting: "Starting ZCode... Ctrl+C to exit",
+      starting: (productName) => `Starting ${productName}... Ctrl+C to exit`,
     },
     transcript: {
       compact: {

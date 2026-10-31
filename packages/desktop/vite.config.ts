@@ -8,6 +8,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolveZCodeEndpointOrigin } from "@zcode/shared/zcodeEndpoint";
 import { pdfJsCMapsPlugin } from "../ui/vite/pdfJsCMapsPlugin.js";
 import { getBuildMetadata } from "./scripts/build-metadata.mjs";
+import { PRODUCT_NAME } from "@zcode/shared/product-brand";
+import { createProductBrandHtmlPlugin } from "../../scripts/product-brand-html-plugin.mjs";
 import { resolveDesktopProductFlavor } from "./scripts/desktop-product-identity.mjs";
 
 // 动态加载仓库根的构建工具，避免配置打包后其 import.meta.dirname 被重定位到 desktop。
@@ -197,6 +199,7 @@ export default defineConfig(({ command, mode }) => {
     pdfJsCMapsPlugin(),
     react(),
     tailwindcss(),
+    createProductBrandHtmlPlugin(PRODUCT_NAME),
   ];
 
   return {

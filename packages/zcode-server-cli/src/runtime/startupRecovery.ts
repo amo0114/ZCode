@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import { readFile } from "node:fs/promises";
 import type { ReleaseManager } from "./releaseManager.js";
 
@@ -9,7 +10,7 @@ export async function recoverSupervisorStartup(
 ): Promise<void> {
   await readFile(uninstalledFile, "utf8")
     .then(() => {
-      throw new Error(`ZCode Server has been uninstalled: ${serverRoot}`);
+      throw new Error(`${PRODUCT_NAME} Server has been uninstalled: ${serverRoot}`);
     })
     .catch((error: unknown) => {
       if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;

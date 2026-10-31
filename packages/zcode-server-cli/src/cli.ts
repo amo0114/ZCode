@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Server lifecycle、首装、迁移与卸载命令共享同一 CLI 解析和安全边界。 */
+import { PRODUCT_NAME } from "@zcode/shared";
 import { fork } from "node:child_process";
 import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -179,7 +180,7 @@ export async function runServerCli(
         // 或卸载接管的服务。锁被占用时直接失败（不等待、不停止现有服务），沿用 uninstall 的冲突输出。
         const restartLock = await acquireLifecycleCommandLock(
           layout,
-          "A ZCode Server update is already running",
+          `A ${PRODUCT_NAME} Server update is already running`,
         );
         try {
           return await runRestart(io, json, layout, runtimeOptions);
@@ -193,7 +194,7 @@ export async function runServerCli(
       case "update": {
         const updateLock = await acquireLifecycleCommandLock(
           layout,
-          "Another ZCode Server update is already running",
+          `Another ${PRODUCT_NAME} Server update is already running`,
         );
         const updateDaemonHandoff =
           runtimeOptions.updateDaemonHandoff ?? createUpdateDaemonHandoff();
@@ -223,7 +224,7 @@ export async function runServerCli(
       case "uninstall": {
         const uninstallLock = await acquireLifecycleCommandLock(
           layout,
-          "A ZCode Server update is already running",
+          `A ${PRODUCT_NAME} Server update is already running`,
         );
         try {
           return await runUninstall(io, json, layout);
@@ -309,7 +310,10 @@ async function runServe(
         const reused = existing.state === "ready" ? existing : await waitForControlReady(layout);
         if (json) stdout(io, reused);
         else
-          stdout(io, `ZCode Server ${reused.state} at ${reused.host ?? ""}:${reused.port ?? ""}`);
+          stdout(
+            io,
+            `${PRODUCT_NAME} Server ${reused.state} at ${reused.host ?? ""}:${reused.port ?? ""}`,
+          );
         return 0;
       }
       if (existing.runningTaskCount > 0) {
@@ -359,7 +363,10 @@ async function runServe(
         if (!isServiceLoadFailure(error)) throw error;
         serviceFallbackReason = (error as Error).message.trim();
         if (!json)
-          stderr(io, `Starting ZCode Server in detached fallback mode: ${serviceFallbackReason}`);
+          stderr(
+            io,
+            `Starting ${PRODUCT_NAME} Server in detached fallback mode: ${serviceFallbackReason}`,
+          );
       }
     }
     if (!serviceStarted) {
@@ -406,7 +413,7 @@ async function runServe(
         baselineUpdatedAt,
         () =>
           childEarlyExit
-            ? `ZCode Server daemon exited before ready (code=${childEarlyExit.code ?? "null"} signal=${childEarlyExit.signal ?? "none"})`
+            ? `${PRODUCT_NAME} Server daemon exited before ready (code=${childEarlyExit.code ?? "null"} signal=${childEarlyExit.signal ?? "none"})`
             : undefined,
         serviceStarted,
       );
@@ -420,7 +427,11 @@ async function runServe(
     }
     // 回退原因只属于本次启动结果，不写入 status.json。
     if (json) stdout(io, serviceFallbackReason ? { ...started, serviceFallbackReason } : started);
-    else stdout(io, `ZCode Server ${started.state} at ${started.host ?? ""}:${started.port ?? ""}`);
+    else
+      stdout(
+        io,
+        `${PRODUCT_NAME} Server ${started.state} at ${started.host ?? ""}:${started.port ?? ""}`,
+      );
     process.stdin.pause();
     process.stdin.destroy();
     return 0;
@@ -495,7 +506,11 @@ async function runServe(
     throw error;
   }
   if (json) stdout(io, status);
-  else stdout(io, `ZCode Server ${status.state} at ${status.host ?? ""}:${status.port ?? ""}`);
+  else
+    stdout(
+      io,
+      `${PRODUCT_NAME} Server ${status.state} at ${status.host ?? ""}:${status.port ?? ""}`,
+    );
   await new Promise<void>((resolve) => {
     foregroundStopped = resolve;
     if (!daemon) {
@@ -607,7 +622,7 @@ async function runUninstall(
   json: boolean,
   layout: ReturnType<typeof resolveServerLayout>,
 ): Promise<number> {
-  const first = await (io.confirm?.("Type DELETE to uninstall ZCode Server: ") ??
+  const first = await (io.confirm?.(`Type DELETE to uninstall ${PRODUCT_NAME} Server: `) ??
     Promise.resolve(""));
   if (first !== "DELETE") throw new Error("Uninstall cancelled");
   const second = await (io.confirm?.("Type DELETE again to confirm: ") ?? Promise.resolve(""));

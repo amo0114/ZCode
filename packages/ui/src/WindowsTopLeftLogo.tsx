@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
 import { ZCodeStartupLogoBadge } from "@/root/RootStartupLoading.js";
 
@@ -18,7 +19,7 @@ export function WindowsTopLeftLogo({
     >
       <span
         role="img"
-        aria-label="ZCode"
+        aria-label={PRODUCT_NAME}
         data-testid="settings-logo"
         className={cn(
           "pointer-events-none flex size-5 items-center justify-center select-none",

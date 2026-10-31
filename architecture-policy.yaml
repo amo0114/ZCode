@@ -1257,6 +1257,28 @@ exceptions:
     rule: unmanaged-new-file
     paths: [packages/shared/src/userInstructions.ts]
     reason: 用户自定义指令字节上限共享常量（与 CLI 读取截断对齐，spec：docs/ui/settings-personalization.md），服务层校验与 UI 计数共用同一数值；仅两个常量导出，接管整个 shared 目录不在本次范围内。
+  - id: product-brand-placement-source
+    rule: unmanaged-new-file
+    paths: [packages/shared/src/productBrand.ts]
+    reason: 品牌剥离的唯一事实源（spec：docs/desktop/product-brand-placement.md），UI/Web/CLI/TUI/Desktop 五个构建共读同一组常量，避免各处再写死产品名；仅两个常量导出，接管整个 shared 目录不在本次范围内。
+  # 品牌剥离：以下文件由上游原样引入，本次只把写死的产品名换成 PRODUCT_NAME 常量，
+  # 不改 owner、模块边界与控制流；接管对应整个目录不在本次范围内。
+  - id: product-brand-placement-tui-startup-edit
+    rule: unmanaged-new-file
+    paths: [apps/zcode-cli/packages/tui/src/app-startup.tsx]
+    reason: 启动提示改为调用 i18n 的 starting(productName) 并传入 PRODUCT_NAME（spec：docs/desktop/product-brand-placement.md），启动屏结构与退出行为不变。
+  - id: product-brand-placement-cua-indicator-edit
+    rule: unmanaged-new-file
+    paths: [packages/desktop/src/main/windowsCuaOperationIndicatorContent.ts]
+    reason: Windows 电脑操作悬浮条只把文案里的产品名换成 PRODUCT_NAME（spec：docs/desktop/product-brand-placement.md），窗口尺寸、绘制内容与更新时机不变。
+  - id: product-brand-placement-office-prompts-edit
+    rule: unmanaged-new-file
+    paths: [packages/ui/src/v4/officeSuggestedPrompts.ts]
+    reason: Office 推荐提示词只把文案里的产品名换成 PRODUCT_NAME（spec：docs/desktop/product-brand-placement.md），提示词集合、插件 id 与图标 URL 不变。
+  - id: product-brand-placement-ignore-template-edit
+    rule: unmanaged-new-file
+    paths: [packages/services/src/file/workspaceFileIgnore.ts]
+    reason: 生成的 .zcodeignore 模板头部注释只把产品名换成 PRODUCT_NAME（spec：docs/desktop/product-brand-placement.md），默认规则集、分区标记与同步语义不变。
   - id: remote-workspace-admission-deadline-existing-edit
     rule: unmanaged-new-file
     paths: [packages/desktop/src/host/remoteWorkspacePreparation.ts]

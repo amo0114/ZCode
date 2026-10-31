@@ -20,7 +20,7 @@ import {
   TID_WORKSPACE_PATH,
   testId,
 } from "@zcode/shared/test-ids";
-import type { AppSettings } from "@zcode/shared";
+import { PRODUCT_NAME, type AppSettings } from "@zcode/shared";
 import { collectWindowsE2EProcessTreePids } from "./e2e-process-cleanup.js";
 import {
   collectE2EWebDriverPageHandleCandidates,
@@ -1445,18 +1445,19 @@ export async function switchToNewestWindow() {
 }
 
 export async function clickAboutMenuItem() {
-  await browser.electron.execute((electron) => {
+  // execute 运行在 Electron 主进程上下文，拿不到测试进程的 import，产品名必须显式传入。
+  await browser.electron.execute((electron, aboutLabel) => {
     const menu = electron.Menu.getApplicationMenu();
     const topMenuLabel = process.platform === "darwin" ? electron.app.name : "Help";
     const topMenu = menu?.items.find((item) => item.label === topMenuLabel);
-    const menuItem = topMenu?.submenu?.items.find((item) => item.label === "About ZCode");
+    const menuItem = topMenu?.submenu?.items.find((item) => item.label === aboutLabel);
 
     if (!menuItem) {
-      throw new Error(`未找到 About ZCode 菜单项: ${topMenuLabel}`);
+      throw new Error(`未找到 About 菜单项: ${topMenuLabel}`);
     }
 
     menuItem.click(undefined as never, undefined, undefined as never);
-  });
+  }, `About ${PRODUCT_NAME}`);
 }
 
 export async function clickDockMenuItem(itemLabel: string) {

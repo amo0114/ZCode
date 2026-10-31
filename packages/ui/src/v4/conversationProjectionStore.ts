@@ -1,4 +1,5 @@
 import type { SessionLifecycleSnapshot } from "@zcode/shared";
+import { PRODUCT_NAME } from "@zcode/shared";
 import { getLocalTtftObserver } from "@/v4/telemetry/local-ttft/contract.js";
 /* eslint-disable max-lines -- projection/base/recovery/optimistic 必须共享一个原子 store 状态机，拆分会重新引入跨对象竞态。 */
 // Per-session projection store（只读 projection store）。
@@ -55,7 +56,7 @@ export function requiresAcceptedInputProjection(type: string): boolean {
 }
 
 /** 退避耗尽时展示给用户的 lastError（无底层 error 对象可引用的换代路径）。 */
-const RUNTIME_RECYCLED_ERROR = "ZCode agent runtime 已被回收，重连未成功";
+const RUNTIME_RECYCLED_ERROR = `${PRODUCT_NAME} agent runtime 已被回收，重连未成功`;
 
 function monotonicNow(): number {
   return typeof performance !== "undefined" ? performance.now() : Date.now();

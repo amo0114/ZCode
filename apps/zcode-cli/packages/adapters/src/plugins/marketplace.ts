@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { PluginDiagnostic, PluginManifest, PluginStoreListing } from "@zcode/contracts";
 import { isOfficialMarketplaceId, ZCODE_OFFICIAL_PLUGIN_MARKETPLACE } from "@zcode/contracts";
-import { DEFAULT_PLUGIN_MARKETPLACES, sanitizeZCodeRuntimeEnv } from "@zcode/shared";
+import { DEFAULT_PLUGIN_MARKETPLACES, PRODUCT_NAME, sanitizeZCodeRuntimeEnv } from "@zcode/shared";
 import { loadPluginMcpServerDefinitions, resolvePluginMcpServers } from "./mcp.js";
 import {
   appendPluginSourceCleanupError,
@@ -2500,7 +2500,7 @@ function pushManifestCompatibilityDiagnostics(input: {
     if (key in input.manifest) {
       input.diagnostics.push({
         code: "plugin_unsupported_component",
-        message: `Plugin component is diagnostic-only in this ZCode runtime: ${key}`,
+        message: `Plugin component is diagnostic-only in this ${PRODUCT_NAME} runtime: ${key}`,
         path: input.manifestPath,
         pluginId: input.pluginId,
         severity: "warning",

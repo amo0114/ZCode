@@ -2,6 +2,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import type { HookEventName, PluginDiagnostic } from "@zcode/contracts";
 import { HookEventName as HookEventNameValue } from "@zcode/contracts";
+import { PRODUCT_NAME } from "@zcode/shared";
 import { fileExists, isRecord, resolveInside } from "./helpers.js";
 import type { LoadedPlugin } from "./types.js";
 
@@ -130,7 +131,7 @@ export function listPluginHookEventNames(input: {
       if (!SUPPORTED_HOOK_EVENTS.has(eventName)) {
         input.diagnostics.push({
           code: "plugin_hook_unsupported_event",
-          message: `Plugin hook event is not supported by this ZCode runtime: ${eventName}`,
+          message: `Plugin hook event is not supported by this ${PRODUCT_NAME} runtime: ${eventName}`,
           path: source.sourcePath,
           pluginId: input.loaded.id,
           severity: "warning",

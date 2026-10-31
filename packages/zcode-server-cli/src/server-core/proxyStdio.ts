@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import { createConnection } from "node:net";
 import { once } from "node:events";
 import type { Readable, Writable } from "node:stream";
@@ -32,7 +33,7 @@ export async function runProxyStdio(options: ProxyStdioOptions): Promise<void> {
   ) {
     throw new ProxyStdioError(
       "daemon-not-ready",
-      "ZCode Server daemon is not ready for proxy-stdio",
+      `${PRODUCT_NAME} Server daemon is not ready for proxy-stdio`,
     );
   }
 
@@ -48,7 +49,7 @@ export async function runProxyStdio(options: ProxyStdioOptions): Promise<void> {
     socket.destroy();
     throw new ProxyStdioError(
       "daemon-connect-failed",
-      "Unable to connect proxy-stdio to the ZCode Server daemon",
+      `Unable to connect proxy-stdio to the ${PRODUCT_NAME} Server daemon`,
       { cause: error },
     );
   }

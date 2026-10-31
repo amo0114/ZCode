@@ -1,4 +1,4 @@
-import { redactFeedbackText } from "@zcode/shared";
+import { PRODUCT_NAME, redactFeedbackText } from "@zcode/shared";
 import type { FeedbackAgentModelContext } from "@/feedback/feedbackSubmitModelContext.js";
 import type {
   FeedbackTicketModule,
@@ -7,7 +7,7 @@ import type {
 } from "@zcode/shared";
 
 const TITLE_MAX = 80;
-const FEEDBACK_ZCODE_AGENT_LABEL = "ZCode Agent";
+const FEEDBACK_ZCODE_AGENT_LABEL = `${PRODUCT_NAME} Agent`;
 
 type MessageFormatter = (descriptor: { id: string }, values?: Record<string, string>) => string;
 

@@ -1,4 +1,5 @@
 import type { BrowserBackendDescriptor } from "@zcode/contracts";
+import { PRODUCT_NAME } from "@zcode/shared";
 
 export function createManagedCdpDescriptor(
   browserId: string,
@@ -8,7 +9,7 @@ export function createManagedCdpDescriptor(
     id: browserId,
     generation,
     type: "cdp",
-    name: "ZCode Headless Chromium",
+    name: `${PRODUCT_NAME} Headless Chromium`,
     capabilities: {
       browser: [],
       tab: [],

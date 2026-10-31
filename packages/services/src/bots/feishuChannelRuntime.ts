@@ -1,5 +1,6 @@
 import {
   isFeishuBotProvider,
+  PRODUCT_NAME,
   type BotConfig,
   type BotProvider,
   type BotProviderCallbackResult,
@@ -88,7 +89,7 @@ export function createFeishuChannelRuntime(deps: FeishuChannelRuntimeDeps) {
           botId: bot.id,
           provider: bot.provider,
           status: "idle",
-          message: "Feishu WebSocket is handled by another ZCode window.",
+          message: `Feishu WebSocket is handled by another ${PRODUCT_NAME} window.`,
         });
         await waitFor(BOT_RUNTIME_LOCK_RETRY_MS, signal);
         continue;

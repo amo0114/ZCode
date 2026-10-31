@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import React from "react";
 import { palette } from "./app-model.js";
 import { ShimmerText, useShimmerFrame } from "./app-motion.js";
@@ -8,16 +9,15 @@ const h = React.createElement as (
   ...children: React.ReactNode[]
 ) => React.ReactElement;
 
-export const ZCODE_LOGO_LINES = [
-  "███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
-  "   ███╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝",
-  "  ███╔╝ ██║     ██║   ██║██║  ██║█████╗  ",
-  " ███╔╝  ██║     ██║   ██║██║  ██║██╔══╝  ",
-  "███████╗╚██████╗╚██████╔╝██████╔╝███████╗",
-  "╚══════╝ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝",
-] as const;
+/**
+ * 空会话占位字标。
+ *
+ * 品牌剥离：原来是固定写死的旧品牌 ASCII 大字，改成由产品名生成的单行标题，
+ * 占位期显示为 PRODUCT_NAME，定名后自动跟随，不需要再重画字模。
+ */
+export const EMPTY_TRANSCRIPT_LOGO_LINES: readonly string[] = [PRODUCT_NAME];
 
-const EMPTY_TRANSCRIPT_LOGO_MIN_HEIGHT = ZCODE_LOGO_LINES.length;
+const EMPTY_TRANSCRIPT_LOGO_MIN_HEIGHT = EMPTY_TRANSCRIPT_LOGO_LINES.length;
 
 export function EmptyTranscriptLogo({
   animated = false,
@@ -48,7 +48,7 @@ function renderLogoContent(input: { animated: boolean; frameMs?: number }): Reac
         width: "100%",
       },
     },
-    ...ZCODE_LOGO_LINES.map((line, index) =>
+    ...EMPTY_TRANSCRIPT_LOGO_LINES.map((line, index) =>
       renderLogoText({
         animated: input.animated,
         baseColor: palette.accent,

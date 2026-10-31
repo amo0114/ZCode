@@ -31,6 +31,7 @@ import {
   type McpOAuthAuthorizationContext,
 } from "./oauth-shared.js";
 import { withTimeout } from "./timeout.js";
+import { PRODUCT_NAME } from "@zcode/shared";
 
 type McpAuthorizationCodeOAuthConfig = Extract<McpOAuthConfig, { type: "authorization_code" }>;
 
@@ -315,7 +316,7 @@ class InteractiveAuthorizationProvider implements OAuthClientProvider {
 
   get clientMetadata(): OAuthClientMetadata {
     return {
-      client_name: this.config.clientName ?? `ZCode ${this.serverName}`,
+      client_name: this.config.clientName ?? `${PRODUCT_NAME} ${this.serverName}`,
       grant_types: ["authorization_code", "refresh_token"],
       redirect_uris: [this.redirectUrl],
       response_types: ["code"],

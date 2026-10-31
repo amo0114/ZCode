@@ -181,7 +181,8 @@ export interface TuiCopy {
   };
   terminal: {
     requiresInteractive: string;
-    starting: string;
+    /** 启动提示由调用方注入产品名，CLI 子 workspace 不重复声明品牌常量。 */
+    starting(productName: string): string;
   };
   transcript: {
     compact: {

@@ -1,5 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { PRODUCT_NAME } from "@zcode/shared";
 import type {
   CustomCommandRoot,
   HookConfig,
@@ -380,7 +381,7 @@ function warnUnsupportedComponents(loaded: LoadedPlugin, diagnostics: PluginDiag
     if (key in loaded.manifest) {
       diagnostics.push({
         code: "plugin_unsupported_component",
-        message: `Plugin component is diagnostic-only in this ZCode runtime: ${key}`,
+        message: `Plugin component is diagnostic-only in this ${PRODUCT_NAME} runtime: ${key}`,
         path: loaded.manifestPath,
         pluginId: loaded.id,
         severity: "warning",
@@ -523,7 +524,7 @@ function parsePluginHookEvents(input: {
     if (!SUPPORTED_HOOK_EVENTS.has(eventName)) {
       input.diagnostics.push({
         code: "plugin_hook_unsupported_event",
-        message: `Plugin hook event is not supported by this ZCode runtime: ${eventName}`,
+        message: `Plugin hook event is not supported by this ${PRODUCT_NAME} runtime: ${eventName}`,
         path: input.sourcePath,
         pluginId: input.loaded.id,
         severity: "warning",

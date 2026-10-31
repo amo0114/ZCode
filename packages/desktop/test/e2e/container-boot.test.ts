@@ -1,9 +1,6 @@
 import { access } from "node:fs/promises";
-import {
-  DEFAULT_WORKSPACE,
-  clearAppData,
-  waitForWorkspaceApp,
-} from "./helpers/desktop-app.js";
+import { PRODUCT_NAME } from "@zcode/shared";
+import { DEFAULT_WORKSPACE, clearAppData, waitForWorkspaceApp } from "./helpers/desktop-app.js";
 
 interface WindowInfo {
   title: string;
@@ -48,7 +45,8 @@ describe("桌面端容器 headless boot demo", () => {
     );
 
     expect(mainWindow).toBeTruthy();
-    expect(mainWindow?.title).toBe("ZCode");
+    // 窗口标题由 renderer/index.html 的 %PRODUCT_NAME% 注入，断言从同一常量派生。
+    expect(mainWindow?.title).toBe(PRODUCT_NAME);
     expect(mainWindow?.visible).toBe(true);
 
     // 修复原因：v4 renderer URL 只承载启动/恢复参数，workspace 绑定已经迁入 store。

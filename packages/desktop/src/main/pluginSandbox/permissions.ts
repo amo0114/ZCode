@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import type { Locale } from "@zcode/shared";
 import type { McpAppsResourcePermission } from "@zcode/shared/mcp-apps";
 import { PLUGIN_SANDBOX_SCHEME } from "./contract.js";
@@ -114,8 +115,7 @@ export function formatPluginSandboxPermissionDialogText(
     return {
       title: "应用权限请求",
       message: `「${input.serverName}」的应用请求使用${list}`,
-      detail:
-        "该页面运行在 ZCode 的沙箱中。允许后，本次运行期间这个 MCP server 的应用可继续使用这些权限；重启桌面端后会再次询问。",
+      detail: `该页面运行在 ${PRODUCT_NAME} 的沙箱中。允许后，本次运行期间这个 MCP server 的应用可继续使用这些权限；重启桌面端后会再次询问。`,
       allowButton: "允许",
       denyButton: "拒绝",
     };
@@ -124,8 +124,7 @@ export function formatPluginSandboxPermissionDialogText(
   return {
     title: "App permission request",
     message: `The "${input.serverName}" app wants to use your ${list}`,
-    detail:
-      "This page runs in the ZCode sandbox. If you allow it, apps from this MCP server can keep using these permissions until ZCode restarts.",
+    detail: `This page runs in the ${PRODUCT_NAME} sandbox. If you allow it, apps from this MCP server can keep using these permissions until ${PRODUCT_NAME} restarts.`,
     allowButton: "Allow",
     denyButton: "Deny",
   };

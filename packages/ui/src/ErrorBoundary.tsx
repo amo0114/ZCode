@@ -1,7 +1,7 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import type { Locale } from "@zcode/shared";
-import { DEFAULT_LOCALE } from "@zcode/shared";
+import { DEFAULT_LOCALE, PRODUCT_NAME } from "@zcode/shared";
 import { DesktopWindowFrame } from "@/DesktopWindowFrame.js";
 import zhCN from "@/i18n/locales/zh-CN.js";
 import enUS from "@/i18n/locales/en-US.js";
@@ -86,7 +86,8 @@ function resolveBoundaryLocale(): Locale {
 function formatBoundaryMessage(id: string): string {
   const locale = resolveBoundaryLocale();
   const messages = locale === "en-US" ? enUS : zhCN;
-  return messages[id] ?? id;
+  // 与 IntlProvider.createIntl 保持同一套品牌注入：错误页可能在没有 IntlProvider 的外壳里渲染。
+  return (messages[id] ?? id).replaceAll("{product}", PRODUCT_NAME);
 }
 
 function haveResetKeysChanged(

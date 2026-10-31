@@ -6,9 +6,11 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { pdfJsCMapsPlugin } from "../ui/vite/pdfJsCMapsPlugin.js";
 import { thirdPartyNoticesVitePlugin } from "../../scripts/third-party-notices.mjs";
+import { createProductBrandHtmlPlugin } from "../../scripts/product-brand-html-plugin.mjs";
 import { resolveRemoteFrontendVersion } from "./vite/remoteFrontendVersion.mjs";
 // Bugfix: Vite 配置在 Node 加载期执行，不能导入 @zcode/shared 根入口。
 // 根入口包含 NodeNext 风格的源码 re-export，Node 会按真实文件查找 .js 并在 bootstrap 阶段失败。
+import { PRODUCT_NAME } from "@zcode/shared/product-brand";
 import { resolveRuntimeZCodeEndpointOrigin } from "@zcode/shared/zcodeEndpoint";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -35,7 +37,13 @@ export default defineConfig(({ mode }) => {
   const zcodeEndpointOrigin = resolveRuntimeZCodeEndpointOrigin(endpointEnv);
 
   return {
-    plugins: [pdfJsCMapsPlugin(), react(), tailwindcss(), thirdPartyNoticesVitePlugin()],
+    plugins: [
+      pdfJsCMapsPlugin(),
+      react(),
+      tailwindcss(),
+      thirdPartyNoticesVitePlugin(),
+      createProductBrandHtmlPlugin(PRODUCT_NAME),
+    ],
     resolve: {
       alias: {
         // 修复 UI 组件库中的 @ 别名解析失败。

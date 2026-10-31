@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "./productBrand.js";
+
 export interface DefaultPluginMarketplace {
   id: string;
   source: string;
@@ -45,7 +47,7 @@ export const DEFAULT_PLUGIN_MARKETPLACES: DefaultPluginMarketplace[] = [
     id: ZCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID,
     source: "https://cdn-zcode.z.ai/zcode/official-plugin/marketplace.json",
     name: ZCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID,
-    description: "Official ZCode plugins marketplace: built-in and community plugins for ZCode.",
+    description: `Official ${PRODUCT_NAME} plugins marketplace: built-in and community plugins for ${PRODUCT_NAME}.`,
     pluginCount: 0,
   },
   {

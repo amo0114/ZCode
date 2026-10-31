@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@zcode/shared";
 import type { WebRemoteControlFailure, WebRemoteControlFailureReason } from "@zcode/shared";
 
 export type WebRemoteControlScreenLocale = "zh-CN" | "en-US";
@@ -72,7 +73,10 @@ const WEB_REMOTE_CONTROL_SCREEN_COPY = {
       description: "电脑端已经断开连接，当前手机页面不能继续控制桌面工作区。",
       detailLabel: "Relay 返回",
       nextStepsTitle: "下一步",
-      nextSteps: ["确认电脑端 ZCode 仍在运行并联网。", "在电脑端重新开启 Web 远程控制后再连接。"],
+      nextSteps: [
+        `确认电脑端 ${PRODUCT_NAME} 仍在运行并联网。`,
+        "在电脑端重新开启 Web 远程控制后再连接。",
+      ],
       action: "重新连接",
     },
     "invalid-mobile-connection": {
@@ -211,7 +215,7 @@ const WEB_REMOTE_CONTROL_SCREEN_COPY = {
       detailLabel: "Relay detail",
       nextStepsTitle: "What happened",
       nextSteps: [
-        "Make sure ZCode is still running and online on desktop.",
+        `Make sure ${PRODUCT_NAME} is still running and online on desktop.`,
         "Start Web remote control again from desktop.",
       ],
       action: "Try Again",

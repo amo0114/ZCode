@@ -7,6 +7,7 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/client";
 import type { Logger, McpOAuthConfig } from "@zcode/contracts";
+import { PRODUCT_NAME } from "@zcode/shared";
 import {
   createLocalhostOAuthCallbackServer,
   type LocalhostOAuthCallbackServer,
@@ -166,7 +167,7 @@ class ZCodeMcpAuthorizationCodeProvider implements OAuthClientProvider {
 
   get clientMetadata(): OAuthClientMetadata {
     return {
-      client_name: this.config.clientName ?? `ZCode ${this.serverName}`,
+      client_name: this.config.clientName ?? `${PRODUCT_NAME} ${this.serverName}`,
       grant_types: ["authorization_code", "refresh_token"],
       redirect_uris: [this.redirectUrl],
       response_types: ["code"],

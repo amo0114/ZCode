@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { PRODUCT_NAME } from "./productBrand.js";
 import type { CommandAgentSource } from "./command-types.js";
 import type { ZCodeProvider } from "./zcode-task-types-core.js";
 
 export const ZCODE_AGENT_PROVIDER = "glm" satisfies ZCodeProvider;
-export const ZCODE_AGENT_PROVIDER_LABEL = "ZCode Agent";
+export const ZCODE_AGENT_PROVIDER_LABEL = `${PRODUCT_NAME} Agent`;
 export const ZCODE_COMMAND_AGENT_SOURCE = "zcodeAgent" satisfies CommandAgentSource;
 
 /**

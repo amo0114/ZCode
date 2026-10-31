@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SessionEventType, type SessionEvent } from "@zcode/contracts";
 import { getZCodeCopy } from "@zcode/i18n";
+import { PRODUCT_NAME } from "@zcode/shared";
 import { LoginRequiredPanel } from "../src/app-components.js";
 import { ContentPane, MessageRow } from "../src/app-transcript-components.js";
-import { EmptyTranscriptLogo, ZCODE_LOGO_LINES } from "../src/app-empty-transcript.js";
+import { EmptyTranscriptLogo, EMPTY_TRANSCRIPT_LOGO_LINES } from "../src/app-empty-transcript.js";
 import { SHIMMER_SWEEP_PERIOD_MS, shimmerTextSegments } from "../src/app-motion.js";
 import { ShikiDiffView, buildDiffRows, buildSplitDiffRows } from "../src/app-shiki-diff-view.js";
 import {
@@ -62,11 +63,11 @@ test("renders a ZCODE logo placeholder for an empty transcript", () => {
   const lines = collectTextLines(EmptyTranscriptLogo());
 
   assert.equal(child?.type, EmptyTranscriptLogo);
-  assert.deepEqual(lines, [...ZCODE_LOGO_LINES]);
+  assert.deepEqual(lines, [...EMPTY_TRANSCRIPT_LOGO_LINES]);
 });
 
 test("projects logo shimmer without changing the source text", () => {
-  const sourceText = ZCODE_LOGO_LINES[0];
+  const sourceText = EMPTY_TRANSCRIPT_LOGO_LINES[0];
   const segments = shimmerTextSegments(sourceText, SHIMMER_SWEEP_PERIOD_MS / 2, {
     baseColor: "#000000",
     highlightColor: "#ffffff",
@@ -87,7 +88,7 @@ test("hides the empty transcript logo when messages are present", () => {
 
   assert.equal(child?.type, MessageRow);
   assert.notEqual(child?.type, EmptyTranscriptLogo);
-  assert.equal(lines.includes(ZCODE_LOGO_LINES[0]), false);
+  assert.equal(lines.includes(EMPTY_TRANSCRIPT_LOGO_LINES[0]), false);
   assert.ok(lines.some((line) => line.includes("hello")));
   assert.equal(
     lines.some((line) => line.includes("User:")),
@@ -290,7 +291,7 @@ test("renders the product version header and workspace directory footer", () => 
   assert.ok(workspaceLine);
   assert.equal(workspaceLine.length, SIDEBAR_CONTENT_WIDTH);
   assert.match(workspaceLine, /\.\.\.$/);
-  assert.ok(lines.includes("ZCode"));
+  assert.ok(lines.includes(PRODUCT_NAME));
   assert.ok(lines.includes(" 0.0.0"));
 });
 
